@@ -1,0 +1,56 @@
+/*!
+ * AS7341_fast.ino
+ * Sends all 8 spectral channels + Clear + NIR as a single CSV line
+ * at 115200 baud for high-speed capture by the companion HTML viewer.
+ *
+ * CSV format (one line per sample):
+ *   F1,F2,F3,F4,F5,F6,F7,F8,CLEAR,NIR\n
+ *   e.g.  1234,2345,3456,4567,5678,6789,7890,8901,12000,3400
+ */
+
+#include "DFRobot_AS7341.h"
+
+DFRobot_AS7341 as7341;
+
+void setup() {
+  Serial.begin(115200);
+
+  while (as7341.begin() != 0) {
+    Serial.println("IIC init failed, please check wire connection");
+    delay(1000);
+  }
+
+  as7341.setAtime(9);
+  as7341.setAstep(599);
+  as7341.setAGAIN(7);
+  as7341.enableLed(true);
+  as7341.controlLed(10);
+
+  Serial.println("F1,F2,F3,F4,F5,F6,F7,F8,CLEAR,NIR");
+}
+
+void loop() {
+  DFRobot_AS7341::sModeOneData_t data1;
+  DFRobot_AS7341::sModeTwoData_t data2;
+
+  // --- First half-cycle: F1–F4 ---
+  as7341.startMeasure(as7341.eF1F4ClearNIR);
+  data1 = as7341.readSpectralDataOne();
+
+  // --- Second half-cycle: F5–F8, Clear, NIR ---
+  as7341.startMeasure(as7341.eF5F8ClearNIR);
+  data2 = as7341.readSpectralDataTwo();
+
+  // Single compact CSV line — no labels, no extra whitespace
+  Serial.print(data1.ADF1);  Serial.print(',');
+  Serial.print(data1.ADF2);  Serial.print(',');
+  Serial.print(data1.ADF3);  Serial.print(',');
+  Serial.print(data1.ADF4);  Serial.print(',');
+  Serial.print(data2.ADF5);  Serial.print(',');
+  Serial.print(data2.ADF6);  Serial.print(',');
+  Serial.print(data2.ADF7);  Serial.print(',');
+  Serial.print(data2.ADF8);  Serial.print(',');
+  Serial.print(data2.ADCLEAR); Serial.print(',');
+  Serial.println(data2.ADNIR);
+  // No delay() — loop as fast as the sensor allows (~35–40 ms per cycle)
+}
