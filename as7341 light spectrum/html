@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AS7341 Spectral Viewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap');
+
+  :root {
+    --bg:       #0a0c10;
+    --panel:    #111520;
+    --border:   #1e2535;
+    --accent:   #00e5ff;
+    --dim:      #3a4560;
+    --text:     #c8d4e8;
+    --ok:       #00e676;
+    --warn:     #ff9100;
+    --err:      #ff1744;
+
+    --c-f1: #b44fff;   /* 415 nm  violet      */
+    --c-f2: #6060ff;   /* 445 nm  indigo-blue */
+    --c-f3: #2196f3;   /* 480 nm  blue        */
+    --c-f4: #00bcd4;   /* 515 nm  cyan        */
+    --c-f5: #4caf50;   /* 555 nm  green       */
+    --c-f6: #cddc39;   /* 590 nm  yellow-grn  */
+    --c-f7: #ff9800;   /* 630 nm  orange      */
+    --c-f8: #f44336;   /* 680 nm  red         */
+    --c-cl: #78909c;   /* clear   grey        */
+    --c-ni: #455a64;   /* NIR     dark grey   */
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  header h1 {
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  header h1 span { color: var(--text); font-weight: 300; }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  button {
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 600;
+    font-size: .8rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    padding: 7px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  button:hover  { background: var(--accent); color: var(--bg); }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.danger { border-color: var(--err); color: var(--err); }
+  button.danger:hover { background: var(--err); color: #fff; }
+
+  #statusDot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--dim);
+    display: inline-block;
+    transition: background .3s;
+  }
+  #statusDot.connected  { background: var(--ok);  box-shadow: 0 0 8px var(--ok); }
+  #statusDot.receiving  { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  #statusDot.error      { background: var(--err); box-shadow: 0 0 8px var(--err); }
+  #statusText { font-size: .8rem; font-family: 'Share Tech Mono', monospace; }
+
+  .baud-select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .8rem;
+    padding: 6px 10px;
+    border-radius: 4px;
+  }
+
+  /* ── Main layout ── */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 18px;
+    gap: 18px;
+  }
+
+  /* ── Graph panel ── */
+  .graph-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px 12px;
+    position: relative;
+    min-height: 320px;
+  }
+  .panel-title {
+    font-size: .7rem;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 10px;
+  }
+  canvas#chart {
+    width: 100%;
+    display: block;
+  }
+
+  /* ── Table panel ── */
+  .table-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .8rem;
+  }
+  thead th {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 600;
+    font-size: .68rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid rgba(30,37,53,.6);
+    transition: background .1s;
+  }
+  tbody tr:hover { background: rgba(0,229,255,.04); }
+  tbody tr.latest { background: rgba(0,229,255,.07); }
+
+  td { padding: 5px 10px; white-space: nowrap; }
+  td.ts { color: var(--dim); font-size: .72rem; }
+
+  .dot-cell { display: flex; align-items: center; gap: 6px; }
+  .ch-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* peak badge */
+  .peak {
+    display: inline-block;
+    background: rgba(0,229,255,.12);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-size: .65rem;
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 600;
+    letter-spacing: .08em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+  }
+
+  /* value bars inside table cells */
+  .bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .bar-bg {
+    flex: 1; height: 6px; background: rgba(255,255,255,.06);
+    border-radius: 3px; overflow: hidden; min-width: 60px;
+  }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width .25s ease; }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .stat-chip {
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .75rem;
+  }
+  .stat-chip span { color: var(--accent); font-weight: 700; margin-left: 5px; }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px;
+    font-size: .7rem; font-family: 'Share Tech Mono', monospace;
+    cursor: pointer; user-select: none; opacity: 1; transition: opacity .2s;
+  }
+  .legend-item.hidden { opacity: .3; }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 2px; }
+
+  /* ── Rate indicator ── */
+  #rateBox {
+    position: absolute; top: 14px; right: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .72rem; color: var(--dim);
+  }
+  #rateBox span { color: var(--ok); }
+
+  /* ── Colour swatch panel ── */
+  .colour-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  #colourBox {
+    width: 120px; height: 120px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: #222;
+    transition: background-color .3s ease;
+    flex-shrink: 0;
+    box-shadow: 0 0 24px rgba(0,0,0,.5);
+  }
+  .colour-info { display: flex; flex-direction: column; gap: 8px; }
+  .colour-hex {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.6rem;
+    letter-spacing: .08em;
+    color: var(--text);
+  }
+  .colour-rgb {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .78rem;
+    color: var(--dim);
+  }
+  .colour-note {
+    font-size: .68rem;
+    color: var(--dim);
+    font-style: italic;
+    max-width: 280px;
+    line-height: 1.5;
+  }
+  .cal-active {
+    display: inline-block;
+    background: rgba(0,230,118,.1);
+    border: 1px solid var(--ok);
+    color: var(--ok);
+    font-size: .65rem;
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 600;
+    letter-spacing: .08em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-left: 6px;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AS7341 <span>Spectral Viewer</span></h1>
+  <div class="controls">
+    <select class="baud-select" id="baudSelect">
+      <option value="9600">9600 baud</option>
+      <option value="115200" selected>115200 baud</option>
+    </select>
+    <div style="display:flex;align-items:center;gap:7px">
+      <div id="statusDot"></div>
+      <span id="statusText">Not connected</span>
+    </div>
+    <button id="btnConnect">Connect</button>
+    <button id="btnDisconnect" class="danger" disabled>Disconnect</button>
+    <button id="btnBlack" title="Captures current readings as black (dark) offset and subtracts from all future samples">Black Cal</button>
+    <button id="btnResetCal" title="Clear black calibration offset">Reset Cal</button>
+    <button id="btnClear">Clear</button>
+  </div>
+</header>
+
+<main>
+  <!-- Graph -->
+  <div class="graph-panel">
+    <div class="panel-title">Live Spectral Graph — last 120 samples per channel</div>
+    <div id="rateBox">Sample rate: <span id="rateVal">—</span> Hz</div>
+    <div class="legend" id="legend"></div>
+    <canvas id="chart" height="220"></canvas>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow" style="display:none">
+    <div class="stat-chip">Samples <span id="sSamples">0</span></div>
+    <div class="stat-chip">Peak channel <span id="sPeakCh">—</span></div>
+    <div class="stat-chip">Peak value <span id="sPeakVal">—</span></div>
+    <div class="stat-chip">Dominant λ <span id="sDomWl">—</span></div>
+  </div>
+
+  <!-- Colour swatch -->
+  <div class="colour-panel">
+    <div id="colourBox"></div>
+    <div class="colour-info">
+      <div class="panel-title" style="margin-bottom:4px">Approximate perceived colour</div>
+      <div class="colour-hex" id="colourHex">#——</div>
+      <div class="colour-rgb" id="colourRgb">R — &nbsp; G — &nbsp; B —</div>
+      <div class="colour-note">Calculated from AS7341 spectral weights via CIE XYZ → sRGB. Accuracy depends on illuminant and gain calibration.</div>
+      <div id="calIndicator" style="display:none"><span class="cal-active">BLACK CAL ACTIVE</span></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-panel">
+    <div class="panel-title">Sample Log (newest first — max 200 rows)</div>
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Time</th>
+          <th>F1 415nm</th>
+          <th>F2 445nm</th>
+          <th>F3 480nm</th>
+          <th>F4 515nm</th>
+          <th>F5 555nm</th>
+          <th>F6 590nm</th>
+          <th>F7 630nm</th>
+          <th>F8 680nm</th>
+          <th>Clear</th>
+          <th>NIR</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+// ── Channel metadata ────────────────────────────────────────────────────
+const CHANNELS = [
+  { key:'F1', label:'F1 415nm', wl:415, color:'#b44fff' },
+  { key:'F2', label:'F2 445nm', wl:445, color:'#6060ff' },
+  { key:'F3', label:'F3 480nm', wl:480, color:'#2196f3' },
+  { key:'F4', label:'F4 515nm', wl:515, color:'#00bcd4' },
+  { key:'F5', label:'F5 555nm', wl:555, color:'#4caf50' },
+  { key:'F6', label:'F6 590nm', wl:590, color:'#cddc39' },
+  { key:'F7', label:'F7 630nm', wl:630, color:'#ff9800' },
+  { key:'F8', label:'F8 680nm', wl:680, color:'#f44336' },
+  { key:'CL', label:'Clear',    wl:null, color:'#78909c' },
+  { key:'NI', label:'NIR',      wl:null, color:'#455a64' },
+];
+
+const MAX_GRAPH_SAMPLES = 120;
+const MAX_TABLE_ROWS    = 200;
+
+// ── State ────────────────────────────────────────────────────────────────
+let port = null, reader = null, readLoopActive = false;
+let sampleCount = 0;
+let history = CHANNELS.map(() => []); // per-channel ring buffers
+let hiddenChannels = new Set();
+let lastSampleTime = null;
+let sampleTimes = [];
+let blackOffset = new Array(10).fill(0);  // black calibration offsets
+let lastRawSample = new Array(10).fill(0); // most recent raw reading
+
+// ── DOM refs ─────────────────────────────────────────────────────────────
+const btnConnect    = document.getElementById('btnConnect');
+const btnDisconnect = document.getElementById('btnDisconnect');
+const btnClear      = document.getElementById('btnClear');
+const btnBlack      = document.getElementById('btnBlack');
+const btnResetCal   = document.getElementById('btnResetCal');
+const calIndicator  = document.getElementById('calIndicator');
+const statusDot     = document.getElementById('statusDot');
+const statusText    = document.getElementById('statusText');
+const tableBody     = document.getElementById('tableBody');
+const canvas        = document.getElementById('chart');
+const ctx           = canvas.getContext('2d');
+const rateVal       = document.getElementById('rateVal');
+const statsRow      = document.getElementById('statsRow');
+const sSamples      = document.getElementById('sSamples');
+const sPeakCh       = document.getElementById('sPeakCh');
+const sPeakVal      = document.getElementById('sPeakVal');
+const sDomWl        = document.getElementById('sDomWl');
+
+// ── Legend ───────────────────────────────────────────────────────────────
+(function buildLegend() {
+  const el = document.getElementById('legend');
+  CHANNELS.forEach((ch, i) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.dataset.idx = i;
+    item.innerHTML = `<div class="legend-swatch" style="background:${ch.color}"></div>${ch.label}`;
+    item.addEventListener('click', () => {
+      if (hiddenChannels.has(i)) { hiddenChannels.delete(i); item.classList.remove('hidden'); }
+      else { hiddenChannels.add(i); item.classList.add('hidden'); }
+      drawChart();
+    });
+    el.appendChild(item);
+  });
+})();
+
+// ── Serial connect ───────────────────────────────────────────────────────
+btnConnect.addEventListener('click', async () => {
+  if (!('serial' in navigator)) {
+    setStatus('error', 'Web Serial not supported — use Chrome or Edge');
+    return;
+  }
+  try {
+    port = await navigator.serial.requestPort();
+    const baud = parseInt(document.getElementById('baudSelect').value);
+    await port.open({ baudRate: baud });
+    setStatus('connected', 'Connected');
+    btnConnect.disabled = true;
+    btnDisconnect.disabled = false;
+    startReadLoop();
+  } catch (e) {
+    setStatus('error', 'Connection failed: ' + e.message);
+  }
+});
+
+btnDisconnect.addEventListener('click', async () => {
+  readLoopActive = false;
+  try { if (reader) { await reader.cancel(); reader = null; } } catch {}
+  try { await port.close(); } catch {}
+  port = null;
+  setStatus('', 'Disconnected');
+  btnConnect.disabled = false;
+  btnDisconnect.disabled = true;
+});
+
+btnClear.addEventListener('click', () => {
+  sampleCount = 0;
+  history = CHANNELS.map(() => []);
+  sampleTimes = [];
+  tableBody.innerHTML = '';
+  statsRow.style.display = 'none';
+  drawChart();
+});
+
+btnBlack.addEventListener('click', () => {
+  // Capture current raw reading as the black offset
+  blackOffset = [...lastRawSample];
+  calIndicator.style.display = 'block';
+});
+
+btnResetCal.addEventListener('click', () => {
+  blackOffset = new Array(10).fill(0);
+  calIndicator.style.display = 'none';
+});
+
+
+async function startReadLoop() {
+  readLoopActive = true;
+  const decoder = new TextDecoderStream();
+  port.readable.pipeTo(decoder.writable);
+  reader = decoder.readable.getReader();
+  let buf = '';
+  try {
+    while (readLoopActive) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let nl;
+      while ((nl = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (line) parseLine(line);
+      }
+    }
+  } catch (e) {
+    if (readLoopActive) setStatus('error', 'Read error: ' + e.message);
+  }
+}
+
+function parseLine(line) {
+  // Skip header / debug lines
+  if (!/^[\d,]+$/.test(line)) return;
+  const parts = line.split(',').map(Number);
+  if (parts.length !== 10 || parts.some(isNaN)) return;
+
+  setStatus('receiving', 'Receiving');
+
+  // Store raw sample for calibration capture
+  lastRawSample = [...parts];
+
+  // Apply black calibration offset — clamp to zero
+  const corrected = parts.map((v, i) => Math.max(0, v - blackOffset[i]));
+
+  const now = new Date();
+  sampleCount++;
+  sampleTimes.push(Date.now());
+  if (sampleTimes.length > 20) sampleTimes.shift();
+
+  // Push corrected values to history buffers
+  corrected.forEach((v, i) => {
+    history[i].push(v);
+    if (history[i].length > MAX_GRAPH_SAMPLES) history[i].shift();
+  });
+
+  drawChart();
+  updateTable(now, corrected);
+  updateStats(corrected);
+  updateColour(corrected);
+  updateRate();
+}
+
+// ── Chart ────────────────────────────────────────────────────────────────
+function drawChart() {
+  const W = canvas.parentElement.clientWidth - 40;
+  const H = 220;
+  canvas.width  = W;
+  canvas.height = H;
+
+  const PAD = { top: 10, right: 20, bottom: 30, left: 52 };
+  const cw = W - PAD.left - PAD.right;
+  const ch = H - PAD.top  - PAD.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // background grid
+  ctx.strokeStyle = 'rgba(30,37,53,.9)';
+  ctx.lineWidth = 1;
+  const gridY = 5;
+  for (let i = 0; i <= gridY; i++) {
+    const y = PAD.top + (ch / gridY) * i;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cw, y); ctx.stroke();
+  }
+
+  if (history[0].length === 0) {
+    ctx.fillStyle = 'rgba(58,69,96,.6)';
+    ctx.font = '13px "Share Tech Mono"';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for data…', W / 2, H / 2);
+    return;
+  }
+
+  const len = history[0].length;
+
+  // Find global max for Y scaling (only visible channels)
+  let globalMax = 0;
+  history.forEach((buf, i) => {
+    if (hiddenChannels.has(i)) return;
+    buf.forEach(v => { if (v > globalMax) globalMax = v; });
+  });
+  if (globalMax === 0) globalMax = 1;
+
+  // Y-axis labels
+  ctx.fillStyle = 'rgba(58,69,96,.9)';
+  ctx.font = '10px "Share Tech Mono"';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= gridY; i++) {
+    const val = Math.round(globalMax * (1 - i / gridY));
+    const y   = PAD.top + (ch / gridY) * i;
+    ctx.fillText(val.toLocaleString(), PAD.left - 6, y + 3);
+  }
+
+  // Lines
+  CHANNELS.forEach((ch_meta, idx) => {
+    if (hiddenChannels.has(idx)) return;
+    const buf = history[idx];
+    if (buf.length < 2) return;
+
+    ctx.beginPath();
+    ctx.strokeStyle = ch_meta.color;
+    ctx.lineWidth   = 1.5;
+    ctx.lineJoin    = 'round';
+    ctx.shadowColor = ch_meta.color;
+    ctx.shadowBlur  = 4;
+
+    buf.forEach((v, i) => {
+      const x = PAD.left + (i / (MAX_GRAPH_SAMPLES - 1)) * cw;
+      const y = PAD.top  + ch * (1 - v / globalMax);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Peak dot on latest sample
+    const last = buf[buf.length - 1];
+    const lx   = PAD.left + ((buf.length - 1) / (MAX_GRAPH_SAMPLES - 1)) * cw;
+    const ly   = PAD.top  + ch * (1 - last / globalMax);
+    ctx.beginPath();
+    ctx.arc(lx, ly, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle   = ch_meta.color;
+    ctx.shadowColor = ch_meta.color;
+    ctx.shadowBlur  = 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+}
+
+// ── Table ────────────────────────────────────────────────────────────────
+function updateTable(ts, vals) {
+  // remove "latest" highlight from previous top row
+  const prev = tableBody.querySelector('tr.latest');
+  if (prev) prev.classList.remove('latest');
+
+  const globalMax = Math.max(...vals);
+
+  const row = document.createElement('tr');
+  row.className = 'latest';
+
+  const tStr = ts.toTimeString().slice(0, 8) + '.' + String(ts.getMilliseconds()).padStart(3,'0');
+
+  let cells = `<td>${sampleCount}</td><td class="ts">${tStr}</td>`;
+
+  vals.forEach((v, i) => {
+    const ch   = CHANNELS[i];
+    const pct  = globalMax > 0 ? (v / globalMax * 100).toFixed(1) : 0;
+    const isPk = (v === globalMax) ? '<span class="peak">PEAK</span>' : '';
+    cells += `
+      <td>
+        <div class="bar-wrap">
+          <div class="dot-cell">
+            <div class="ch-dot" style="background:${ch.color}"></div>
+            ${v.toLocaleString()}${isPk}
+          </div>
+          <div class="bar-bg">
+            <div class="bar-fill" style="width:${pct}%;background:${ch.color}"></div>
+          </div>
+        </div>
+      </td>`;
+  });
+
+  row.innerHTML = cells;
+  tableBody.insertBefore(row, tableBody.firstChild);
+
+  // prune old rows
+  while (tableBody.rows.length > MAX_TABLE_ROWS) tableBody.deleteRow(tableBody.rows.length - 1);
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────
+function updateStats(vals) {
+  statsRow.style.display = 'flex';
+  sSamples.textContent   = sampleCount.toLocaleString();
+
+  // Only spectral channels (0–7) for dominant wavelength
+  let maxIdx = 0, maxVal = 0;
+  for (let i = 0; i < 8; i++) {
+    if (vals[i] > maxVal) { maxVal = vals[i]; maxIdx = i; }
+  }
+
+  sPeakCh.textContent  = CHANNELS[maxIdx].label;
+  sPeakVal.textContent = maxVal.toLocaleString();
+  sDomWl.textContent   = CHANNELS[maxIdx].wl ? CHANNELS[maxIdx].wl + ' nm' : '—';
+}
+
+// ── Sample rate ───────────────────────────────────────────────────────────
+function updateRate() {
+  if (sampleTimes.length < 2) { rateVal.textContent = '—'; return; }
+  const span = (sampleTimes[sampleTimes.length - 1] - sampleTimes[0]) / 1000;
+  const rate = (sampleTimes.length - 1) / span;
+  rateVal.textContent = rate.toFixed(1) + ' Hz';
+}
+
+// ── Spectral → XYZ → sRGB colour estimation ─────────────────────────────
+// CIE 1931 2° observer X, Y, Z weights for each AS7341 channel centre wavelength.
+// Values interpolated from standard CIE tables.
+const CIE_WEIGHTS = [
+  // wl    X        Y        Z
+  [415,  0.0173,  0.0005,  0.0897],  // F1
+  [445,  0.3362,  0.0380,  1.7721],  // F2
+  [480,  0.0956,  0.1390,  0.8120],  // F3
+  [515,  0.0147,  0.3230,  0.0549],  // F4
+  [555,  0.1954,  0.9950,  0.0040],  // F5
+  [590,  1.0544,  0.7570,  0.0000],  // F6
+  [630,  0.2650,  0.1070,  0.0000],  // F7
+  [680,  0.0170,  0.0061,  0.0000],  // F8
+];
+
+function spectralToRGB(vals) {
+  // vals[0..7] = F1..F8 raw counts
+  let X = 0, Y = 0, Z = 0;
+  CIE_WEIGHTS.forEach(([wl, wx, wy, wz], i) => {
+    X += wx * vals[i];
+    Y += wy * vals[i];
+    Z += wz * vals[i];
+  });
+
+  // Normalise so Y = 1 (relative luminance)
+  if (Y === 0) return { r: 0, g: 0, b: 0 };
+  X /= Y; Z /= Y; Y = 1.0;
+
+  // XYZ → linear sRGB (D65 matrix)
+  let r =  3.2406 * X - 1.5372 * Y - 0.4986 * Z;
+  let g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
+  let b =  0.0557 * X - 0.2040 * Y + 1.0570 * Z;
+
+  // Clamp negatives, normalise to brightest channel = 1
+  r = Math.max(0, r);
+  g = Math.max(0, g);
+  b = Math.max(0, b);
+  const mx = Math.max(r, g, b, 1e-9);
+  r /= mx; g /= mx; b /= mx;
+
+  // Gamma encode (sRGB)
+  const gamma = v => v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1/2.4) - 0.055;
+  return {
+    r: Math.round(gamma(r) * 255),
+    g: Math.round(gamma(g) * 255),
+    b: Math.round(gamma(b) * 255),
+  };
+}
+
+function updateColour(vals) {
+  const { r, g, b } = spectralToRGB(vals);
+  const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2,'0')).join('');
+  document.getElementById('colourBox').style.backgroundColor = hex;
+  document.getElementById('colourHex').textContent = hex.toUpperCase();
+  document.getElementById('colourRgb').innerHTML =
+    `R&nbsp;${r}&nbsp;&nbsp; G&nbsp;${g}&nbsp;&nbsp; B&nbsp;${b}`;
+  document.getElementById('colourHex').style.color = hex;
+}
+
+// ── Status helper ─────────────────────────────────────────────────────────
+function setStatus(state, msg) {
+  statusDot.className  = state;
+  statusText.textContent = msg;
+}
+
+// ── Resize redraw ─────────────────────────────────────────────────────────
+window.addEventListener('resize', drawChart);
+drawChart();
+
+// ── Web Serial availability notice ───────────────────────────────────────
+if (!('serial' in navigator)) {
+  setStatus('error', 'Web Serial API not available — use Chrome or Edge');
+  btnConnect.disabled = true;
+}
+</script>
+</body>
+</html>
