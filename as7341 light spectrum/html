@@ -2,493 +2,484 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AS7341 Spectral Viewer</title>
+<title>AS7341 Spectral Analyser</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap');
 
-  :root {
-    --bg:       #0a0c10;
-    --panel:    #111520;
-    --border:   #1e2535;
-    --accent:   #00e5ff;
-    --dim:      #3a4560;
-    --text:     #c8d4e8;
-    --ok:       #00e676;
-    --warn:     #ff9100;
-    --err:      #ff1744;
+:root {
+  --bg:      #080b0f;
+  --surface: #0e1218;
+  --panel:   #121820;
+  --border:  #1c2333;
+  --text:    #b8c8d8;
+  --dim:     #3a4a5a;
+  --accent:  #00d4aa;
+  --ok:      #00e676;
+  --warn:    #ffab40;
+  --err:     #ff4560;
+  --match:   #00e676;
+}
 
-    --c-f1: #b44fff;   /* 415 nm  violet      */
-    --c-f2: #6060ff;   /* 445 nm  indigo-blue */
-    --c-f3: #2196f3;   /* 480 nm  blue        */
-    --c-f4: #00bcd4;   /* 515 nm  cyan        */
-    --c-f5: #4caf50;   /* 555 nm  green       */
-    --c-f6: #cddc39;   /* 590 nm  yellow-grn  */
-    --c-f7: #ff9800;   /* 630 nm  orange      */
-    --c-f8: #f44336;   /* 680 nm  red         */
-    --c-cl: #78909c;   /* clear   grey        */
-    --c-ni: #455a64;   /* NIR     dark grey   */
-  }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-weight: 300;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Exo 2', sans-serif;
-    font-weight: 300;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+header h1 {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+header h1 span { color: var(--dim); font-weight: 400; }
 
-  /* ── Header ── */
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 24px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  header h1 {
-    font-family: 'Exo 2', sans-serif;
-    font-weight: 800;
-    font-size: 1.25rem;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-  header h1 span { color: var(--text); font-weight: 300; }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+select {
+  font-family: 'DM Mono', monospace;
+  font-size: .75rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 4px;
+}
 
-  button {
-    font-family: 'Exo 2', sans-serif;
-    font-weight: 600;
-    font-size: .8rem;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    border: 1px solid var(--accent);
-    background: transparent;
-    color: var(--accent);
-    padding: 7px 18px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background .15s, color .15s;
-  }
-  button:hover  { background: var(--accent); color: var(--bg); }
-  button:disabled { opacity: .35; cursor: not-allowed; }
-  button.danger { border-color: var(--err); color: var(--err); }
-  button.danger:hover { background: var(--err); color: #fff; }
+btn, button {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: .7rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .3; cursor: not-allowed; }
+button.primary { border-color: var(--accent); color: var(--accent); }
+button.primary:hover { background: var(--accent); color: var(--bg); }
+button.danger { border-color: var(--err); color: var(--err); }
+button.danger:hover { background: var(--err); color: #fff; }
+button.save-btn { border-color: var(--warn); color: var(--warn); }
+button.save-btn:hover { background: var(--warn); color: var(--bg); }
 
-  #statusDot {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--dim);
-    display: inline-block;
-    transition: background .3s;
-  }
-  #statusDot.connected  { background: var(--ok);  box-shadow: 0 0 8px var(--ok); }
-  #statusDot.receiving  { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-  #statusDot.error      { background: var(--err); box-shadow: 0 0 8px var(--err); }
-  #statusText { font-size: .8rem; font-family: 'Share Tech Mono', monospace; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--dim); flex-shrink: 0;
+  transition: background .3s, box-shadow .3s;
+}
+.status-dot.connected { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.status-dot.receiving { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.status-dot.error     { background: var(--err);  box-shadow: 0 0 6px var(--err); }
+#statusText { font-size: .72rem; }
 
-  .baud-select {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: .8rem;
-    padding: 6px 10px;
-    border-radius: 4px;
-  }
+/* ── Main layout ── */
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px;
+}
 
-  /* ── Main layout ── */
-  main {
-    flex: 1;
-    display: grid;
-    grid-template-rows: auto 1fr;
-    grid-template-columns: 1fr;
-    gap: 0;
-    padding: 18px;
-    gap: 18px;
-  }
+/* ── Graph panel ── */
+.graph-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 20px 14px;
+  position: relative;
+}
+.panel-label {
+  font-family: 'Syne', sans-serif;
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 12px;
+}
+canvas#specChart { width: 100%; display: block; }
 
-  /* ── Graph panel ── */
-  .graph-panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 20px 12px;
-    position: relative;
-    min-height: 320px;
-  }
-  .panel-title {
-    font-size: .7rem;
-    font-weight: 600;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--dim);
-    margin-bottom: 10px;
-  }
-  canvas#chart {
-    width: 100%;
-    display: block;
-  }
+/* ── Bottom row: cal + match side by side ── */
+.bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) { .bottom-row { grid-template-columns: 1fr; } }
 
-  /* ── Table panel ── */
-  .table-panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 20px;
-    overflow-x: auto;
-  }
+/* ── Cal panel ── */
+.cal-panel, .match-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: .8rem;
-  }
-  thead th {
-    text-align: left;
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--border);
-    font-family: 'Exo 2', sans-serif;
-    font-weight: 600;
-    font-size: .68rem;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--dim);
-    white-space: nowrap;
-  }
-  tbody tr {
-    border-bottom: 1px solid rgba(30,37,53,.6);
-    transition: background .1s;
-  }
-  tbody tr:hover { background: rgba(0,229,255,.04); }
-  tbody tr.latest { background: rgba(0,229,255,.07); }
+.cal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-  td { padding: 5px 10px; white-space: nowrap; }
-  td.ts { color: var(--dim); font-size: .72rem; }
+.cal-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 40px;
+}
+.cal-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
+.cal-bar {
+  width: 100%; border-radius: 2px 2px 0 0;
+  transition: height .3s ease;
+  min-height: 2px;
+}
+.cal-bar-label { font-size: .5rem; color: var(--dim); }
+#calStatus {
+  font-size: .7rem;
+  color: var(--dim);
+  font-style: italic;
+}
+#calStatus.active { color: var(--ok); font-style: normal; }
 
-  .dot-cell { display: flex; align-items: center; gap: 6px; }
-  .ch-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+/* ── Match panel ── */
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.saved-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: .72rem;
+  transition: border-color .2s;
+  cursor: default;
+}
+.saved-entry.matched {
+  border-color: var(--match);
+  background: rgba(0,230,118,.06);
+}
+.saved-swatch {
+  width: 18px; height: 18px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,.1);
+}
+.saved-name { flex: 1; color: var(--text); }
+.match-score {
+  font-size: .65rem;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  color: var(--dim);
+  min-width: 36px;
+  text-align: right;
+}
+.match-score.hit { color: var(--match); }
+.del-btn {
+  font-size: .6rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+.del-btn:hover { border-color: var(--err); color: var(--err); }
 
-  /* peak badge */
-  .peak {
-    display: inline-block;
-    background: rgba(0,229,255,.12);
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    font-size: .65rem;
-    font-family: 'Exo 2', sans-serif;
-    font-weight: 600;
-    letter-spacing: .08em;
-    padding: 1px 6px;
-    border-radius: 3px;
-    margin-left: 4px;
-  }
+.match-banner {
+  display: none;
+  padding: 8px 14px;
+  background: rgba(0,230,118,.1);
+  border: 1px solid var(--match);
+  border-radius: 5px;
+  color: var(--match);
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: .85rem;
+  letter-spacing: .08em;
+  text-align: center;
+  animation: pulse 1s ease infinite alternate;
+}
+.match-banner.visible { display: block; }
+@keyframes pulse { from { opacity: .7; } to { opacity: 1; } }
 
-  /* value bars inside table cells */
-  .bar-wrap { display: flex; align-items: center; gap: 8px; }
-  .bar-bg {
-    flex: 1; height: 6px; background: rgba(255,255,255,.06);
-    border-radius: 3px; overflow: hidden; min-width: 60px;
-  }
-  .bar-fill { height: 100%; border-radius: 3px; transition: width .25s ease; }
+/* ── Threshold ── */
+.threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.threshold-row label {
+  font-family: 'Syne', sans-serif;
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+}
+input[type=range] {
+  flex: 1;
+  min-width: 80px;
+  accent-color: var(--accent);
+  height: 4px;
+}
+#threshVal {
+  font-size: .8rem;
+  color: var(--accent);
+  min-width: 32px;
+  text-align: right;
+}
 
-  /* ── Stats row ── */
-  .stats-row {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 4px;
-  }
-  .stat-chip {
-    background: rgba(255,255,255,.04);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 6px 14px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: .75rem;
-  }
-  .stat-chip span { color: var(--accent); font-weight: 700; margin-left: 5px; }
+/* ── Save name input ── */
+.save-row { display: flex; gap: 8px; }
+.save-row input[type=text] {
+  flex: 1;
+  font-family: 'DM Mono', monospace;
+  font-size: .75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 4px;
+  outline: none;
+}
+.save-row input[type=text]:focus { border-color: var(--warn); }
 
-  /* ── Legend ── */
-  .legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 10px;
-  }
-  .legend-item {
-    display: flex; align-items: center; gap: 5px;
-    font-size: .7rem; font-family: 'Share Tech Mono', monospace;
-    cursor: pointer; user-select: none; opacity: 1; transition: opacity .2s;
-  }
-  .legend-item.hidden { opacity: .3; }
-  .legend-swatch { width: 12px; height: 12px; border-radius: 2px; }
+.io-row { display: flex; gap: 8px; }
 
-  /* ── Rate indicator ── */
-  #rateBox {
-    position: absolute; top: 14px; right: 20px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: .72rem; color: var(--dim);
-  }
-  #rateBox span { color: var(--ok); }
-
-  /* ── Colour swatch panel ── */
-  .colour-panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    flex-wrap: wrap;
-  }
-  #colourBox {
-    width: 120px; height: 120px;
-    border-radius: 8px;
-    border: 2px solid var(--border);
-    background: #222;
-    transition: background-color .3s ease;
-    flex-shrink: 0;
-    box-shadow: 0 0 24px rgba(0,0,0,.5);
-  }
-  .colour-info { display: flex; flex-direction: column; gap: 8px; }
-  .colour-hex {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 1.6rem;
-    letter-spacing: .08em;
-    color: var(--text);
-  }
-  .colour-rgb {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: .78rem;
-    color: var(--dim);
-  }
-  .colour-note {
-    font-size: .68rem;
-    color: var(--dim);
-    font-style: italic;
-    max-width: 280px;
-    line-height: 1.5;
-  }
-  .cal-active {
-    display: inline-block;
-    background: rgba(0,230,118,.1);
-    border: 1px solid var(--ok);
-    color: var(--ok);
-    font-size: .65rem;
-    font-family: 'Exo 2', sans-serif;
-    font-weight: 600;
-    letter-spacing: .08em;
-    padding: 2px 8px;
-    border-radius: 3px;
-    margin-left: 6px;
-  }
-
-  /* scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>AS7341 <span>Spectral Viewer</span></h1>
+  <h1>AS7341 <span>/ Spectral Analyser</span></h1>
   <div class="controls">
-    <select class="baud-select" id="baudSelect">
-      <option value="9600">9600 baud</option>
-      <option value="115200" selected>115200 baud</option>
+    <select id="baudSelect">
+      <option value="9600">9600</option>
+      <option value="115200" selected>115200</option>
     </select>
     <div style="display:flex;align-items:center;gap:7px">
-      <div id="statusDot"></div>
+      <div class="status-dot" id="statusDot"></div>
       <span id="statusText">Not connected</span>
     </div>
-    <button id="btnConnect">Connect</button>
-    <button id="btnDisconnect" class="danger" disabled>Disconnect</button>
-    <button id="btnBlack" title="Captures current readings as black (dark) offset and subtracts from all future samples">Black Cal</button>
-    <button id="btnResetCal" title="Clear black calibration offset">Reset Cal</button>
-    <button id="btnClear">Clear</button>
+    <button class="primary" id="btnConnect">Connect</button>
+    <button class="danger" id="btnDisconnect" disabled>Disconnect</button>
   </div>
 </header>
 
 <main>
-  <!-- Graph -->
+
+  <!-- Spectral graph -->
   <div class="graph-panel">
-    <div class="panel-title">Live Spectral Graph — last 120 samples per channel</div>
-    <div id="rateBox">Sample rate: <span id="rateVal">—</span> Hz</div>
-    <div class="legend" id="legend"></div>
-    <canvas id="chart" height="220"></canvas>
+    <div class="panel-label">Live Spectral Profile — wavelength (nm) vs intensity</div>
+    <canvas id="specChart" height="280"></canvas>
   </div>
 
-  <!-- Stats -->
-  <div class="stats-row" id="statsRow" style="display:none">
-    <div class="stat-chip">Samples <span id="sSamples">0</span></div>
-    <div class="stat-chip">Peak channel <span id="sPeakCh">—</span></div>
-    <div class="stat-chip">Peak value <span id="sPeakVal">—</span></div>
-    <div class="stat-chip">Dominant λ <span id="sDomWl">—</span></div>
-  </div>
+  <div class="bottom-row">
 
-  <!-- Colour swatch -->
-  <div class="colour-panel">
-    <div id="colourBox"></div>
-    <div class="colour-info">
-      <div class="panel-title" style="margin-bottom:4px">Approximate perceived colour</div>
-      <div class="colour-hex" id="colourHex">#——</div>
-      <div class="colour-rgb" id="colourRgb">R — &nbsp; G — &nbsp; B —</div>
-      <div class="colour-note">Calculated from AS7341 spectral weights via CIE XYZ → sRGB. Accuracy depends on illuminant and gain calibration.</div>
-      <div id="calIndicator" style="display:none"><span class="cal-active">BLACK CAL ACTIVE</span></div>
+    <!-- Dark calibration -->
+    <div class="cal-panel">
+      <div class="panel-label">Dark Calibration</div>
+      <div class="cal-actions">
+        <button id="btnDarkCal">Capture Dark</button>
+        <button class="danger" id="btnResetCal">Reset Cal</button>
+      </div>
+      <div class="cal-bars" id="calBars"></div>
+      <div id="calStatus">No calibration captured</div>
     </div>
-  </div>
 
-  <!-- Table -->
-  <div class="table-panel">
-    <div class="panel-title">Sample Log (newest first — max 200 rows)</div>
-    <table id="dataTable">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Time</th>
-          <th>F1 415nm</th>
-          <th>F2 445nm</th>
-          <th>F3 480nm</th>
-          <th>F4 515nm</th>
-          <th>F5 555nm</th>
-          <th>F6 590nm</th>
-          <th>F7 630nm</th>
-          <th>F8 680nm</th>
-          <th>Clear</th>
-          <th>NIR</th>
-        </tr>
-      </thead>
-      <tbody id="tableBody"></tbody>
-    </table>
+    <!-- Profile save & match -->
+    <div class="match-panel">
+      <div class="panel-label">Profile Match</div>
+
+      <div class="threshold-row">
+        <label>Tolerance</label>
+        <input type="range" id="threshSlider" min="50" max="100" value="85" step="1">
+        <span id="threshVal">85</span>
+      </div>
+
+      <div class="match-banner" id="matchBanner">MATCH DETECTED</div>
+
+      <div class="save-row">
+        <input type="text" id="saveName" placeholder="Profile name…" maxlength="24">
+        <button class="save-btn" id="btnSave">Save</button>
+      </div>
+
+      <div class="io-row">
+        <button id="btnExport">Export JSON</button>
+        <button id="btnImport">Load JSON</button>
+        <input type="file" id="fileInput" accept=".json" style="display:none">
+      </div>
+
+      <div class="saved-list" id="savedList">
+        <div style="font-size:.7rem;color:var(--dim);font-style:italic">No profiles saved yet</div>
+      </div>
+    </div>
+
   </div>
 </main>
 
 <script>
-// ── Channel metadata ────────────────────────────────────────────────────
-const CHANNELS = [
-  { key:'F1', label:'F1 415nm', wl:415, color:'#b44fff' },
-  { key:'F2', label:'F2 445nm', wl:445, color:'#6060ff' },
-  { key:'F3', label:'F3 480nm', wl:480, color:'#2196f3' },
-  { key:'F4', label:'F4 515nm', wl:515, color:'#00bcd4' },
-  { key:'F5', label:'F5 555nm', wl:555, color:'#4caf50' },
-  { key:'F6', label:'F6 590nm', wl:590, color:'#cddc39' },
-  { key:'F7', label:'F7 630nm', wl:630, color:'#ff9800' },
-  { key:'F8', label:'F8 680nm', wl:680, color:'#f44336' },
-  { key:'CL', label:'Clear',    wl:null, color:'#78909c' },
-  { key:'NI', label:'NIR',      wl:null, color:'#455a64' },
+// ── Channel definitions ─────────────────────────────────────────────────
+// Wavelengths are centre nm of each AS7341 channel
+const CH = [
+  { nm: 415, label:'F1\n415',  color:'#9c27b0' },
+  { nm: 445, label:'F2\n445',  color:'#3f51b5' },
+  { nm: 480, label:'F3\n480',  color:'#2196f3' },
+  { nm: 515, label:'F4\n515',  color:'#00bcd4' },
+  { nm: 555, label:'F5\n555',  color:'#4caf50' },
+  { nm: 590, label:'F6\n590',  color:'#cddc39' },
+  { nm: 630, label:'F7\n630',  color:'#ff9800' },
+  { nm: 680, label:'F8\n680',  color:'#f44336' },
+  { nm: null, label:'CLR',     color:'#78909c' },
+  { nm: null, label:'NIR',     color:'#37474f' },
 ];
 
-const MAX_GRAPH_SAMPLES = 120;
-const MAX_TABLE_ROWS    = 200;
+// Spectral channels only (indices 0–7) for profile matching
+const SPEC_IDX = [0,1,2,3,4,5,6,7];
 
-// ── State ────────────────────────────────────────────────────────────────
-let port = null, reader = null, readLoopActive = false;
-let sampleCount = 0;
-let history = CHANNELS.map(() => []); // per-channel ring buffers
-let hiddenChannels = new Set();
-let lastSampleTime = null;
-let sampleTimes = [];
-let blackOffset = new Array(10).fill(0);  // black calibration offsets
-let lastRawSample = new Array(10).fill(0); // most recent raw reading
+// CIE XYZ weights for colour swatch
+const XYZ_W = [
+  [0.0173,0.0005,0.0897],[0.3362,0.0380,1.7721],[0.0956,0.1390,0.8120],
+  [0.0147,0.3230,0.0549],[0.1954,0.9950,0.0040],[1.0544,0.7570,0.0000],
+  [0.2650,0.1070,0.0000],[0.0170,0.0061,0.0000],
+];
 
-// ── DOM refs ─────────────────────────────────────────────────────────────
-const btnConnect    = document.getElementById('btnConnect');
-const btnDisconnect = document.getElementById('btnDisconnect');
-const btnClear      = document.getElementById('btnClear');
-const btnBlack      = document.getElementById('btnBlack');
-const btnResetCal   = document.getElementById('btnResetCal');
-const calIndicator  = document.getElementById('calIndicator');
-const statusDot     = document.getElementById('statusDot');
-const statusText    = document.getElementById('statusText');
-const tableBody     = document.getElementById('tableBody');
-const canvas        = document.getElementById('chart');
-const ctx           = canvas.getContext('2d');
-const rateVal       = document.getElementById('rateVal');
-const statsRow      = document.getElementById('statsRow');
-const sSamples      = document.getElementById('sSamples');
-const sPeakCh       = document.getElementById('sPeakCh');
-const sPeakVal      = document.getElementById('sPeakVal');
-const sDomWl        = document.getElementById('sDomWl');
+// ── State ───────────────────────────────────────────────────────────────
+let port=null, reader=null, readLoopActive=false;
+let darkOffset = new Array(10).fill(0);
+let darkCaptured = false;
+let lastRaw = new Array(10).fill(0);
+let lastCorrected = new Array(10).fill(0);
+let savedProfiles = [];   // [{name, vals(8), color}]
+let threshold = 85;
 
-// ── Legend ───────────────────────────────────────────────────────────────
-(function buildLegend() {
-  const el = document.getElementById('legend');
-  CHANNELS.forEach((ch, i) => {
-    const item = document.createElement('div');
-    item.className = 'legend-item';
-    item.dataset.idx = i;
-    item.innerHTML = `<div class="legend-swatch" style="background:${ch.color}"></div>${ch.label}`;
-    item.addEventListener('click', () => {
-      if (hiddenChannels.has(i)) { hiddenChannels.delete(i); item.classList.remove('hidden'); }
-      else { hiddenChannels.add(i); item.classList.add('hidden'); }
-      drawChart();
-    });
-    el.appendChild(item);
-  });
-})();
+// ── DOM ─────────────────────────────────────────────────────────────────
+const canvas      = document.getElementById('specChart');
+const ctx         = canvas.getContext('2d');
+const btnConnect  = document.getElementById('btnConnect');
+const btnDisc     = document.getElementById('btnDisconnect');
+const btnDarkCal  = document.getElementById('btnDarkCal');
+const btnResetCal = document.getElementById('btnResetCal');
+const btnSave     = document.getElementById('btnSave');
+const calBarsEl   = document.getElementById('calBars');
+const calStatus   = document.getElementById('calStatus');
+const savedList   = document.getElementById('savedList');
+const matchBanner = document.getElementById('matchBanner');
+const threshSlider= document.getElementById('threshSlider');
+const threshVal   = document.getElementById('threshVal');
+const saveNameEl  = document.getElementById('saveName');
+
+// ── Build dark cal mini-bars ─────────────────────────────────────────────
+CH.forEach((ch, i) => {
+  const wrap = document.createElement('div');
+  wrap.className = 'cal-bar-wrap';
+  wrap.innerHTML = `<div class="cal-bar" id="cb${i}" style="height:2px;background:${ch.color}"></div>
+                    <div class="cal-bar-label">${ch.label.split('\n')[0]}</div>`;
+  calBarsEl.appendChild(wrap);
+});
+
+// ── Threshold slider ─────────────────────────────────────────────────────
+threshSlider.addEventListener('input', () => {
+  threshold = +threshSlider.value;
+  threshVal.textContent = threshold;
+  checkMatches(lastCorrected);
+});
 
 // ── Serial connect ───────────────────────────────────────────────────────
 btnConnect.addEventListener('click', async () => {
-  if (!('serial' in navigator)) {
-    setStatus('error', 'Web Serial not supported — use Chrome or Edge');
-    return;
-  }
+  if (!('serial' in navigator)) { setStatus('error','Web Serial not supported — use Chrome/Edge'); return; }
   try {
     port = await navigator.serial.requestPort();
-    const baud = parseInt(document.getElementById('baudSelect').value);
-    await port.open({ baudRate: baud });
-    setStatus('connected', 'Connected');
-    btnConnect.disabled = true;
-    btnDisconnect.disabled = false;
+    await port.open({ baudRate: +document.getElementById('baudSelect').value });
+    setStatus('connected','Connected');
+    btnConnect.disabled = true; btnDisc.disabled = false;
     startReadLoop();
-  } catch (e) {
-    setStatus('error', 'Connection failed: ' + e.message);
-  }
+  } catch(e) { setStatus('error','Failed: '+e.message); }
 });
 
-btnDisconnect.addEventListener('click', async () => {
+btnDisc.addEventListener('click', async () => {
   readLoopActive = false;
-  try { if (reader) { await reader.cancel(); reader = null; } } catch {}
-  try { await port.close(); } catch {}
-  port = null;
-  setStatus('', 'Disconnected');
-  btnConnect.disabled = false;
-  btnDisconnect.disabled = true;
+  try { if(reader){ await reader.cancel(); reader=null; } } catch{}
+  try { await port.close(); } catch{}
+  port=null;
+  setStatus('','Disconnected');
+  btnConnect.disabled=false; btnDisc.disabled=true;
 });
 
-btnClear.addEventListener('click', () => {
-  sampleCount = 0;
-  history = CHANNELS.map(() => []);
-  sampleTimes = [];
-  tableBody.innerHTML = '';
-  statsRow.style.display = 'none';
-  drawChart();
-});
-
-btnBlack.addEventListener('click', () => {
-  // Capture current raw reading as the black offset
-  blackOffset = [...lastRawSample];
-  calIndicator.style.display = 'block';
+// ── Dark calibration ─────────────────────────────────────────────────────
+btnDarkCal.addEventListener('click', () => {
+  darkOffset = [...lastRaw];
+  darkCaptured = true;
+  calStatus.textContent = 'Dark captured — offsets: ' + darkOffset.slice(0,8).map(v=>v.toLocaleString()).join(', ');
+  calStatus.className = 'active';
+  // Show mini bars scaled to dark offset values
+  const mx = Math.max(...darkOffset, 1);
+  darkOffset.forEach((v,i) => {
+    const bar = document.getElementById('cb'+i);
+    if(bar) bar.style.height = Math.max(2, Math.round(v/mx*36)) + 'px';
+  });
 });
 
 btnResetCal.addEventListener('click', () => {
-  blackOffset = new Array(10).fill(0);
-  calIndicator.style.display = 'none';
+  darkOffset = new Array(10).fill(0);
+  darkCaptured = false;
+  calStatus.textContent = 'No calibration captured';
+  calStatus.className = '';
+  CH.forEach((_,i) => { const b=document.getElementById('cb'+i); if(b) b.style.height='2px'; });
 });
 
+// ── Save profile ─────────────────────────────────────────────────────────
+btnSave.addEventListener('click', () => {
+  const name = saveNameEl.value.trim() || ('Profile ' + (savedProfiles.length+1));
+  const vals = SPEC_IDX.map(i => lastCorrected[i]);
+  const color = spectralToHex(lastCorrected);
+  savedProfiles.push({ name, vals, color });
+  saveNameEl.value = '';
+  renderSavedList();
+  checkMatches(lastCorrected);
+});
 
+// ── Read loop ────────────────────────────────────────────────────────────
 async function startReadLoop() {
   readLoopActive = true;
   const decoder = new TextDecoderStream();
@@ -503,269 +494,338 @@ async function startReadLoop() {
       let nl;
       while ((nl = buf.indexOf('\n')) !== -1) {
         const line = buf.slice(0, nl).trim();
-        buf = buf.slice(nl + 1);
+        buf = buf.slice(nl+1);
         if (line) parseLine(line);
       }
     }
-  } catch (e) {
-    if (readLoopActive) setStatus('error', 'Read error: ' + e.message);
-  }
+  } catch(e) { if(readLoopActive) setStatus('error','Read error: '+e.message); }
 }
 
 function parseLine(line) {
-  // Skip header / debug lines
   if (!/^[\d,]+$/.test(line)) return;
   const parts = line.split(',').map(Number);
   if (parts.length !== 10 || parts.some(isNaN)) return;
-
-  setStatus('receiving', 'Receiving');
-
-  // Store raw sample for calibration capture
-  lastRawSample = [...parts];
-
-  // Apply black calibration offset — clamp to zero
-  const corrected = parts.map((v, i) => Math.max(0, v - blackOffset[i]));
-
-  const now = new Date();
-  sampleCount++;
-  sampleTimes.push(Date.now());
-  if (sampleTimes.length > 20) sampleTimes.shift();
-
-  // Push corrected values to history buffers
-  corrected.forEach((v, i) => {
-    history[i].push(v);
-    if (history[i].length > MAX_GRAPH_SAMPLES) history[i].shift();
-  });
-
-  drawChart();
-  updateTable(now, corrected);
-  updateStats(corrected);
-  updateColour(corrected);
-  updateRate();
+  setStatus('receiving','Receiving');
+  lastRaw = [...parts];
+  lastCorrected = parts.map((v,i) => Math.max(0, v - darkOffset[i]));
+  drawSpectrum(lastCorrected);
+  checkMatches(lastCorrected);
 }
 
-// ── Chart ────────────────────────────────────────────────────────────────
-function drawChart() {
+// ── Spectral graph ───────────────────────────────────────────────────────
+function drawSpectrum(vals) {
+  const DPR = window.devicePixelRatio || 1;
   const W = canvas.parentElement.clientWidth - 40;
-  const H = 220;
-  canvas.width  = W;
-  canvas.height = H;
+  const H = 280;
+  canvas.width  = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(DPR, DPR);
 
-  const PAD = { top: 10, right: 20, bottom: 30, left: 52 };
-  const cw = W - PAD.left - PAD.right;
-  const ch = H - PAD.top  - PAD.bottom;
+  const PAD = { top:16, right:20, bottom:52, left:58 };
+  const gw = W - PAD.left - PAD.right;
+  const gh = H - PAD.top  - PAD.bottom;
 
   ctx.clearRect(0, 0, W, H);
 
-  // background grid
-  ctx.strokeStyle = 'rgba(30,37,53,.9)';
+  // Grid
+  const gridLines = 5;
+  const maxVal = Math.max(...vals, 1);
+
+  ctx.strokeStyle = 'rgba(28,35,51,.95)';
   ctx.lineWidth = 1;
-  const gridY = 5;
-  for (let i = 0; i <= gridY; i++) {
-    const y = PAD.top + (ch / gridY) * i;
-    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cw, y); ctx.stroke();
+  for (let i=0; i<=gridLines; i++) {
+    const y = PAD.top + gh * (i/gridLines);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left+gw, y); ctx.stroke();
   }
 
-  if (history[0].length === 0) {
-    ctx.fillStyle = 'rgba(58,69,96,.6)';
-    ctx.font = '13px "Share Tech Mono"';
-    ctx.textAlign = 'center';
-    ctx.fillText('Waiting for data…', W / 2, H / 2);
-    return;
-  }
-
-  const len = history[0].length;
-
-  // Find global max for Y scaling (only visible channels)
-  let globalMax = 0;
-  history.forEach((buf, i) => {
-    if (hiddenChannels.has(i)) return;
-    buf.forEach(v => { if (v > globalMax) globalMax = v; });
-  });
-  if (globalMax === 0) globalMax = 1;
-
-  // Y-axis labels
-  ctx.fillStyle = 'rgba(58,69,96,.9)';
-  ctx.font = '10px "Share Tech Mono"';
+  // Y axis labels
+  ctx.fillStyle = 'rgba(58,74,90,.9)';
+  ctx.font = `10px 'DM Mono'`;
   ctx.textAlign = 'right';
-  for (let i = 0; i <= gridY; i++) {
-    const val = Math.round(globalMax * (1 - i / gridY));
-    const y   = PAD.top + (ch / gridY) * i;
-    ctx.fillText(val.toLocaleString(), PAD.left - 6, y + 3);
+  for (let i=0; i<=gridLines; i++) {
+    const val = Math.round(maxVal * (1 - i/gridLines));
+    const y   = PAD.top + gh * (i/gridLines);
+    ctx.fillText(val.toLocaleString(), PAD.left-8, y+3);
   }
 
-  // Lines
-  CHANNELS.forEach((ch_meta, idx) => {
-    if (hiddenChannels.has(idx)) return;
-    const buf = history[idx];
-    if (buf.length < 2) return;
+  // Y axis title
+  ctx.save();
+  ctx.translate(13, PAD.top + gh/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillStyle = 'rgba(58,74,90,.7)';
+  ctx.font = `10px 'DM Mono'`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Intensity (counts)', 0, 0);
+  ctx.restore();
 
+  // X axis — only spectral channels, spaced by nm
+  // Map wavelength 415–680 nm to x axis
+  const NM_MIN = 400;
+  const NM_MAX = 700;
+  const nmToX = nm => PAD.left + (nm - NM_MIN) / (NM_MAX - NM_MIN) * gw;
+
+  // X axis nm labels
+  ctx.fillStyle = 'rgba(58,74,90,.8)';
+  ctx.font = `10px 'DM Mono'`;
+  ctx.textAlign = 'center';
+  for (let nm=400; nm<=700; nm+=50) {
+    const x = nmToX(nm);
     ctx.beginPath();
-    ctx.strokeStyle = ch_meta.color;
-    ctx.lineWidth   = 1.5;
-    ctx.lineJoin    = 'round';
-    ctx.shadowColor = ch_meta.color;
-    ctx.shadowBlur  = 4;
+    ctx.strokeStyle = 'rgba(28,35,51,.6)';
+    ctx.lineWidth = 1;
+    ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top+gh);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(58,74,90,.8)';
+    ctx.fillText(nm+'nm', x, PAD.top+gh+16);
+  }
 
-    buf.forEach((v, i) => {
-      const x = PAD.left + (i / (MAX_GRAPH_SAMPLES - 1)) * cw;
-      const y = PAD.top  + ch * (1 - v / globalMax);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  // X axis title
+  ctx.fillStyle = 'rgba(58,74,90,.7)';
+  ctx.font = `10px 'DM Mono'`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Wavelength (nm)', PAD.left + gw/2, H-6);
+
+  // Saved profile ghost lines (draw under current)
+  savedProfiles.forEach(prof => {
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,.08)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    prof.vals.forEach((v, ii) => {
+      const ch = CH[ii];
+      if (!ch.nm) return;
+      const x = nmToX(ch.nm);
+      const y = PAD.top + gh * (1 - v/maxVal);
+      ii===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
     });
     ctx.stroke();
-    ctx.shadowBlur = 0;
+    ctx.setLineDash([]);
+  });
 
-    // Peak dot on latest sample
-    const last = buf[buf.length - 1];
-    const lx   = PAD.left + ((buf.length - 1) / (MAX_GRAPH_SAMPLES - 1)) * cw;
-    const ly   = PAD.top  + ch * (1 - last / globalMax);
+  // ── Draw spectral bars + connecting curve ─────────────────────────────
+  // Compute bar positions
+  const specChs = CH.filter(c=>c.nm!==null);
+  const barW = Math.max(12, gw / (NM_MAX-NM_MIN) * 22); // ~22nm wide bars
+
+  // Gradient bars
+  specChs.forEach((ch, ii) => {
+    const v = vals[ii];
+    const x = nmToX(ch.nm);
+    const barH = gh * (v / maxVal);
+    const y = PAD.top + gh - barH;
+
+    // Glow under bar
+    const grd = ctx.createLinearGradient(0, y, 0, PAD.top+gh);
+    grd.addColorStop(0, ch.color + 'cc');
+    grd.addColorStop(1, ch.color + '11');
+    ctx.fillStyle = grd;
     ctx.beginPath();
-    ctx.arc(lx, ly, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle   = ch_meta.color;
-    ctx.shadowColor = ch_meta.color;
-    ctx.shadowBlur  = 8;
+    ctx.roundRect(x - barW/2, y, barW, barH, [3,3,0,0]);
+    ctx.fill();
+
+    // Bar outline
+    ctx.strokeStyle = ch.color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Top glow dot
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI*2);
+    ctx.fillStyle = ch.color;
+    ctx.shadowColor = ch.color;
+    ctx.shadowBlur = 10;
     ctx.fill();
     ctx.shadowBlur = 0;
-  });
-}
 
-// ── Table ────────────────────────────────────────────────────────────────
-function updateTable(ts, vals) {
-  // remove "latest" highlight from previous top row
-  const prev = tableBody.querySelector('tr.latest');
-  if (prev) prev.classList.remove('latest');
-
-  const globalMax = Math.max(...vals);
-
-  const row = document.createElement('tr');
-  row.className = 'latest';
-
-  const tStr = ts.toTimeString().slice(0, 8) + '.' + String(ts.getMilliseconds()).padStart(3,'0');
-
-  let cells = `<td>${sampleCount}</td><td class="ts">${tStr}</td>`;
-
-  vals.forEach((v, i) => {
-    const ch   = CHANNELS[i];
-    const pct  = globalMax > 0 ? (v / globalMax * 100).toFixed(1) : 0;
-    const isPk = (v === globalMax) ? '<span class="peak">PEAK</span>' : '';
-    cells += `
-      <td>
-        <div class="bar-wrap">
-          <div class="dot-cell">
-            <div class="ch-dot" style="background:${ch.color}"></div>
-            ${v.toLocaleString()}${isPk}
-          </div>
-          <div class="bar-bg">
-            <div class="bar-fill" style="width:${pct}%;background:${ch.color}"></div>
-          </div>
-        </div>
-      </td>`;
+    // Channel label below x axis
+    ctx.fillStyle = ch.color;
+    ctx.font = `9px 'DM Mono'`;
+    ctx.textAlign = 'center';
+    ctx.fillText(ch.label.split('\n')[0], x, PAD.top+gh+28);
+    ctx.fillStyle = 'rgba(58,74,90,.6)';
+    ctx.fillText(ch.label.split('\n')[1]||'', x, PAD.top+gh+39);
   });
 
-  row.innerHTML = cells;
-  tableBody.insertBefore(row, tableBody.firstChild);
+  // Connecting line through bar tops
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,255,255,.18)';
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  specChs.forEach((ch, ii) => {
+    const x = nmToX(ch.nm);
+    const y = PAD.top + gh * (1 - vals[ii]/maxVal);
+    ii===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
 
-  // prune old rows
-  while (tableBody.rows.length > MAX_TABLE_ROWS) tableBody.deleteRow(tableBody.rows.length - 1);
+  // Clear + NIR as small sidebar indicators (right of main plot)
+  // (omitted from main nm axis since they don't have a simple wavelength)
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────
-function updateStats(vals) {
-  statsRow.style.display = 'flex';
-  sSamples.textContent   = sampleCount.toLocaleString();
+// ── Profile matching ─────────────────────────────────────────────────────
+function cosineSimilarity(a, b) {
+  // Normalised dot product — 100 = identical profile shape
+  let dot=0, magA=0, magB=0;
+  for (let i=0; i<a.length; i++) { dot+=a[i]*b[i]; magA+=a[i]*a[i]; magB+=b[i]*b[i]; }
+  if (magA===0||magB===0) return 0;
+  return Math.round((dot / (Math.sqrt(magA)*Math.sqrt(magB)))*100);
+}
 
-  // Only spectral channels (0–7) for dominant wavelength
-  let maxIdx = 0, maxVal = 0;
-  for (let i = 0; i < 8; i++) {
-    if (vals[i] > maxVal) { maxVal = vals[i]; maxIdx = i; }
+function checkMatches(corrected) {
+  if (savedProfiles.length===0) return;
+  const current = SPEC_IDX.map(i=>corrected[i]);
+  let anyMatch = false;
+  let bestName = '';
+  let bestScore = 0;
+
+  savedProfiles.forEach((prof, idx) => {
+    const score = cosineSimilarity(current, prof.vals);
+    const el = document.getElementById('se'+idx);
+    const sc = document.getElementById('ss'+idx);
+    if (el && sc) {
+      sc.textContent = score;
+      if (score >= threshold) {
+        el.classList.add('matched');
+        sc.classList.add('hit');
+        anyMatch = true;
+        if (score > bestScore) { bestScore=score; bestName=prof.name; }
+      } else {
+        el.classList.remove('matched');
+        sc.classList.remove('hit');
+      }
+    }
+  });
+
+  if (anyMatch) {
+    matchBanner.textContent = `MATCH — ${bestName} (${bestScore}%)`;
+    matchBanner.classList.add('visible');
+  } else {
+    matchBanner.classList.remove('visible');
   }
-
-  sPeakCh.textContent  = CHANNELS[maxIdx].label;
-  sPeakVal.textContent = maxVal.toLocaleString();
-  sDomWl.textContent   = CHANNELS[maxIdx].wl ? CHANNELS[maxIdx].wl + ' nm' : '—';
 }
 
-// ── Sample rate ───────────────────────────────────────────────────────────
-function updateRate() {
-  if (sampleTimes.length < 2) { rateVal.textContent = '—'; return; }
-  const span = (sampleTimes[sampleTimes.length - 1] - sampleTimes[0]) / 1000;
-  const rate = (sampleTimes.length - 1) / span;
-  rateVal.textContent = rate.toFixed(1) + ' Hz';
-}
-
-// ── Spectral → XYZ → sRGB colour estimation ─────────────────────────────
-// CIE 1931 2° observer X, Y, Z weights for each AS7341 channel centre wavelength.
-// Values interpolated from standard CIE tables.
-const CIE_WEIGHTS = [
-  // wl    X        Y        Z
-  [415,  0.0173,  0.0005,  0.0897],  // F1
-  [445,  0.3362,  0.0380,  1.7721],  // F2
-  [480,  0.0956,  0.1390,  0.8120],  // F3
-  [515,  0.0147,  0.3230,  0.0549],  // F4
-  [555,  0.1954,  0.9950,  0.0040],  // F5
-  [590,  1.0544,  0.7570,  0.0000],  // F6
-  [630,  0.2650,  0.1070,  0.0000],  // F7
-  [680,  0.0170,  0.0061,  0.0000],  // F8
-];
-
-function spectralToRGB(vals) {
-  // vals[0..7] = F1..F8 raw counts
-  let X = 0, Y = 0, Z = 0;
-  CIE_WEIGHTS.forEach(([wl, wx, wy, wz], i) => {
-    X += wx * vals[i];
-    Y += wy * vals[i];
-    Z += wz * vals[i];
+// ── Render saved list ────────────────────────────────────────────────────
+function renderSavedList() {
+  if (savedProfiles.length===0) {
+    savedList.innerHTML = '<div style="font-size:.7rem;color:var(--dim);font-style:italic">No profiles saved yet</div>';
+    return;
+  }
+  savedList.innerHTML = '';
+  savedProfiles.forEach((prof, idx) => {
+    const el = document.createElement('div');
+    el.className = 'saved-entry';
+    el.id = 'se'+idx;
+    el.innerHTML = `
+      <div class="saved-swatch" style="background:${prof.color}"></div>
+      <div class="saved-name">${prof.name}</div>
+      <div class="match-score" id="ss${idx}">—</div>
+      <button class="del-btn" onclick="deleteProfile(${idx})">DEL</button>`;
+    savedList.appendChild(el);
   });
+}
 
-  // Normalise so Y = 1 (relative luminance)
-  if (Y === 0) return { r: 0, g: 0, b: 0 };
-  X /= Y; Z /= Y; Y = 1.0;
+function deleteProfile(idx) {
+  savedProfiles.splice(idx,1);
+  renderSavedList();
+  checkMatches(lastCorrected);
+}
 
-  // XYZ → linear sRGB (D65 matrix)
-  let r =  3.2406 * X - 1.5372 * Y - 0.4986 * Z;
-  let g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
-  let b =  0.0557 * X - 0.2040 * Y + 1.0570 * Z;
-
-  // Clamp negatives, normalise to brightest channel = 1
-  r = Math.max(0, r);
-  g = Math.max(0, g);
-  b = Math.max(0, b);
-  const mx = Math.max(r, g, b, 1e-9);
-  r /= mx; g /= mx; b /= mx;
-
-  // Gamma encode (sRGB)
-  const gamma = v => v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1/2.4) - 0.055;
-  return {
-    r: Math.round(gamma(r) * 255),
-    g: Math.round(gamma(g) * 255),
-    b: Math.round(gamma(b) * 255),
+// ── Export / Import profiles ─────────────────────────────────────────────
+document.getElementById('btnExport').addEventListener('click', () => {
+  if (savedProfiles.length === 0) { alert('No profiles to export.'); return; }
+  const payload = {
+    version: 1,
+    exported: new Date().toISOString(),
+    darkOffset,
+    darkCaptured,
+    profiles: savedProfiles
   };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'as7341_profiles_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('btnImport').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const payload = JSON.parse(ev.target.result);
+      if (!payload.profiles || !Array.isArray(payload.profiles)) throw new Error('Invalid file format');
+
+      // Offer to merge or replace
+      const action = savedProfiles.length > 0
+        ? confirm('Add to existing profiles?\n\nOK = merge   Cancel = replace')
+        : false;
+
+      if (!action) savedProfiles = [];
+      payload.profiles.forEach(p => {
+        // Avoid duplicate names
+        if (!savedProfiles.find(x => x.name === p.name)) savedProfiles.push(p);
+      });
+
+      // Restore dark cal if present and none currently captured
+      if (!darkCaptured && payload.darkCaptured && payload.darkOffset) {
+        darkOffset = payload.darkOffset;
+        darkCaptured = true;
+        calStatus.textContent = 'Dark offset loaded from file';
+        calStatus.className = 'active';
+        const mx = Math.max(...darkOffset, 1);
+        darkOffset.forEach((v,i) => {
+          const bar = document.getElementById('cb'+i);
+          if (bar) bar.style.height = Math.max(2, Math.round(v/mx*36)) + 'px';
+        });
+      }
+
+      renderSavedList();
+      checkMatches(lastCorrected);
+    } catch(err) {
+      alert('Could not load file: ' + err.message);
+    }
+    e.target.value = ''; // reset so same file can be re-loaded
+  };
+  reader.readAsText(file);
+});
+
+// ── Spectral → hex colour ────────────────────────────────────────────────
+function spectralToHex(vals) {
+  let X=0,Y=0,Z=0;
+  XYZ_W.forEach(([wx,wy,wz],i)=>{ X+=wx*vals[i]; Y+=wy*vals[i]; Z+=wz*vals[i]; });
+  if(Y===0) return '#888888';
+  X/=Y; Z/=Y; Y=1;
+  let r= 3.2406*X-1.5372*Y-0.4986*Z;
+  let g=-0.9689*X+1.8758*Y+0.0415*Z;
+  let b= 0.0557*X-0.2040*Y+1.0570*Z;
+  r=Math.max(0,r); g=Math.max(0,g); b=Math.max(0,b);
+  const mx=Math.max(r,g,b,1e-9);
+  r/=mx; g/=mx; b/=mx;
+  const gm=v=>v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055;
+  return '#'+[r,g,b].map(v=>Math.round(gm(v)*255).toString(16).padStart(2,'0')).join('');
 }
 
-function updateColour(vals) {
-  const { r, g, b } = spectralToRGB(vals);
-  const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2,'0')).join('');
-  document.getElementById('colourBox').style.backgroundColor = hex;
-  document.getElementById('colourHex').textContent = hex.toUpperCase();
-  document.getElementById('colourRgb').innerHTML =
-    `R&nbsp;${r}&nbsp;&nbsp; G&nbsp;${g}&nbsp;&nbsp; B&nbsp;${b}`;
-  document.getElementById('colourHex').style.color = hex;
-}
-
-// ── Status helper ─────────────────────────────────────────────────────────
+// ── Status ───────────────────────────────────────────────────────────────
 function setStatus(state, msg) {
-  statusDot.className  = state;
-  statusText.textContent = msg;
+  document.getElementById('statusDot').className='status-dot '+(state||'');
+  document.getElementById('statusText').textContent=msg;
 }
 
-// ── Resize redraw ─────────────────────────────────────────────────────────
-window.addEventListener('resize', drawChart);
-drawChart();
+// ── Init ─────────────────────────────────────────────────────────────────
+window.addEventListener('resize', ()=>drawSpectrum(lastCorrected));
+drawSpectrum(new Array(10).fill(0));
 
-// ── Web Serial availability notice ───────────────────────────────────────
 if (!('serial' in navigator)) {
-  setStatus('error', 'Web Serial API not available — use Chrome or Edge');
-  btnConnect.disabled = true;
+  setStatus('error','Web Serial not supported — use Chrome or Edge');
+  btnConnect.disabled=true;
 }
 </script>
 </body>
