@@ -10,7 +10,7 @@
 #define EEPROM_SIZE   24
 #define CAL_ADDR      0
 
-const char* ssid     = "LIS3MDL Calibration";
+const char* ssid     = "ESP32 Access Point";
 const char* password = "";
 
 Adafruit_LIS3MDL lis3mdl;
@@ -19,6 +19,7 @@ WebServer server(80);
 float offset_x = 0, offset_y = 0;
 float min_x, max_x, min_y, max_y;
 bool calibrating = false;
+float currentBearing = 0;
 
 // ── EEPROM ──────────────────────────────────────────────
 void saveCalibration() {
@@ -44,34 +45,76 @@ void loadCalibration() {
 }
 
 // ── WEB PAGES ────────────────────────────────────────────
-String buildPage(String message) {
+String buildPage() {
   String page = "<!DOCTYPE html><html><head><meta charset='UTF-8'>";
   page += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  page += "<title>LIS3MDL Calibration</title>";
+  page += "<title>LIS3MDL Compass</title>";
   page += "<style>";
   page += "body{font-family:Helvetica,sans-serif;background:#f5f7fb;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;}";
-  page += ".card{background:#fff;border-radius:12px;padding:40px;box-shadow:0 2px 12px rgba(0,0,0,0.1);text-align:center;max-width:400px;width:90%;}";
+  page += ".card{background:#fff;border-radius:12px;padding:40px;box-shadow:0 2px 12px rgba(0,0,0,0.1);text-align:center;max-width:460px;width:90%;}";
   page += "h2{margin-top:0;font-size:22px;color:#1e293b;}";
-  page += "p{font-size:18px;color:#475569;}";
-  page += ".status{font-size:20px;font-weight:bold;margin:20px 0;color:#2563eb;}";
+  page += ".bearing-val{font-size:64px;font-weight:bold;color:#2563eb;margin:10px 0;}";
+  page += ".bearing-label{font-size:20px;color:#64748b;margin-bottom:24px;}";
+  page += ".compass{margin:20px auto;position:relative;width:200px;height:200px;}";
+  page += ".compass svg{width:200px;height:200px;}";
+  page += ".status{font-size:16px;font-weight:bold;margin:16px 0;color:#2563eb;}";
   page += "a{display:inline-block;margin:10px 6px;padding:14px 28px;border-radius:8px;font-size:16px;font-weight:bold;text-decoration:none;color:#fff;}";
   page += ".start{background:#2563eb;} .start:hover{background:#1e40af;}";
   page += ".stop{background:#dc2626;} .stop:hover{background:#b91c1c;}";
   page += "</style></head><body><div class='card'>";
-  page += "<h2>LIS3MDL Compass Calibration</h2>";
-  page += "<p class='status'>" + message + "</p>";
+  page += "<h2>LIS3MDL Compass</h2>";
+
+  // Compass rose SVG
+  page += "<div class='compass'><svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'>";
+  page += "<circle cx='100' cy='100' r='95' fill='#f1f5f9' stroke='#cbd5e1' stroke-width='2'/>";
+  page += "<text x='100' y='22' text-anchor='middle' font-size='16' font-weight='bold' fill='#dc2626'>N</text>";
+  page += "<text x='100' y='188' text-anchor='middle' font-size='16' font-weight='bold' fill='#475569'>S</text>";
+  page += "<text x='185' y='105' text-anchor='middle' font-size='16' font-weight='bold' fill='#475569'>E</text>";
+  page += "<text x='15' y='105' text-anchor='middle' font-size='16' font-weight='bold' fill='#475569'>W</text>";
+  // Needle — rotates via JS
+  page += "<g id='needle' transform='rotate(0,100,100)'>";
+  page += "<polygon points='100,20 94,100 100,115 106,100' fill='#dc2626'/>";
+  page += "<polygon points='100,180 94,100 100,115 106,100' fill='#94a3b8'/>";
+  page += "<circle cx='100' cy='100' r='6' fill='#1e293b'/>";
+  page += "</g></svg></div>";
+
+  page += "<div class='bearing-val' id='bearing'>---</div>";
+  page += "<div class='bearing-label'>degrees</div>";
+  page += "<div class='status' id='calstatus'>" + String(calibrating ? "Calibrating — rotate sensor 360°" : "Ready") + "</div>";
+
   if (!calibrating) {
     page += "<a class='start' href='/start'>Start Calibration</a>";
   } else {
     page += "<a class='stop' href='/stop'>Stop &amp; Save</a>";
   }
+
+  page += "<script>";
+  page += "function update(){";
+  page += "fetch('/data').then(r=>r.json()).then(d=>{";
+  page += "document.getElementById('bearing').textContent=d.bearing.toFixed(1);";
+  page += "document.getElementById('needle').setAttribute('transform','rotate('+d.bearing+',100,100)');";
+  page += "document.getElementById('calstatus').textContent=d.calibrating?'Calibrating — rotate sensor 360°':'Ready';";
+  page += "});";
+  page += "}";
+  page += "setInterval(update,200);";
+  page += "update();";
+  page += "</script>";
+
   page += "</div></body></html>";
   return page;
 }
 
 void handleRoot() {
-  String msg = calibrating ? "Calibrating — rotate sensor 360°" : "Ready";
-  server.send(200, "text/html", buildPage(msg));
+  server.send(200, "text/html", buildPage());
+}
+
+void handleData() {
+  String json = "{\"bearing\":";
+  json += String(currentBearing, 1);
+  json += ",\"calibrating\":";
+  json += calibrating ? "true" : "false";
+  json += "}";
+  server.send(200, "application/json", json);
 }
 
 void handleStart() {
@@ -125,6 +168,7 @@ void setup() {
   Serial.println(WiFi.softAPIP());
 
   server.on("/",      handleRoot);
+  server.on("/data",  handleData);
   server.on("/start", handleStart);
   server.on("/stop",  handleStop);
   server.begin();
@@ -150,14 +194,12 @@ void loop() {
   float cx = x - offset_x;
   float cy = y - offset_y;
 
-  float bearing = atan2(cy, cx) * 180.0 / PI;
-  if (bearing < 0) bearing += 360.0;
+  currentBearing = atan2(cy, cx) * 180.0 / PI;
+  if (currentBearing < 0) currentBearing += 360.0;
 
   Serial.print("Bearing: ");
-  Serial.print(bearing, 1);
-  if (calibrating) Serial.print(" deg  [CALIBRATING]");
-  else             Serial.print(" deg");
-  Serial.println();
+  Serial.print(currentBearing, 1);
+  Serial.println(calibrating ? " deg  [CALIBRATING]" : " deg");
 
   delay(200);
 }
