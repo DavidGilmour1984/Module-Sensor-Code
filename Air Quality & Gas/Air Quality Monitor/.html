@@ -2,167 +2,1609 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>CSV Map Visualiser</title>
+<title>Advanced Sensor Log Visualiser</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tz-lookup/tz.js"></script>
 
 <style>
-body {
-  margin: 0;
-  font-family: Helvetica, Arial, sans-serif;
+:root{
+  --bg:#0f172a;
+  --card:#1e293b;
+  --ink:#f1f5f9;
+  --muted:#94a3b8;
+  --accent:#3b82f6;
+  --accentDark:#1e40af;
+  --success:#10b981;
+  --warning:#f59e0b;
+  --error:#ef4444;
+  --border:#334155;
+  --shadow:0 20px 50px rgba(0,0,0,0.5);
+  --gradient:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
-#map {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  width: 100vw;
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:'Segoe UI', Helvetica, Arial, sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  overflow:hidden;
 }
-#ui {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: white;
-  padding: 12px;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-  z-index: 1000;
-  max-height: 90vh;
-  overflow-y: auto;
-  width: 260px;
+
+/* Top bar */
+#topbar{
+  position:absolute;
+  top:0; left:0; right:0;
+  height:70px;
+  background:linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
+  border-bottom:2px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+  z-index:2000;
+  box-shadow:0 4px 20px rgba(0,0,0,0.3);
 }
-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
+
+#brand{
+  display:flex;
+  flex-direction:column;
+  line-height:1.1;
+  gap:2px;
 }
+#brand strong{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#brand span{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+#viewTabs{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.seg{
+  display:flex;
+  background:#334155;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:4px;
+  gap:4px;
+}
+.seg button{
+  border:0;
+  background:transparent;
+  padding:10px 14px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:13px;
+  color:var(--muted);
+  transition:all 0.2s;
+}
+.seg button:hover{
+  background:rgba(59,130,246,0.1);
+}
+.seg button.active{
+  background:var(--accent);
+  color:white;
+  box-shadow:0 8px 20px rgba(59,130,246,0.4);
+}
+
+#openPanelBtn{
+  border:1px solid var(--border);
+  background:rgba(255,255,255,0.05);
+  padding:10px 14px;
+  border-radius:12px;
+  cursor:pointer;
+  font-size:13px;
+  color:var(--ink);
+  transition:all 0.2s;
+}
+#openPanelBtn:hover{
+  background:rgba(59,130,246,0.2);
+  border-color:var(--accent);
+}
+
+/* Main stage */
+#stage{
+  position:absolute;
+  top:70px; left:0; right:0; bottom:0;
+}
+
+/* Views */
+.view{
+  position:absolute;
+  top:0; left:0; right:0; bottom:0;
+  display:none;
+}
+.view.active{
+  display:block;
+}
+
+#map{
+  height:100%;
+  width:100%;
+}
+
+/* Graph container */
+#graphWrap{
+  position:absolute;
+  top:0; left:0; right:0; bottom:0;
+  padding:20px;
+}
+#graphCard{
+  height:100%;
+  width:100%;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  box-shadow:var(--shadow);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+#graphHead{
+  padding:16px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  gap:10px;
+  align-items:baseline;
+}
+#graphHead strong{font-size:17px}
+#graphHead span{font-size:12px;color:var(--muted)}
+#chartArea{
+  position:relative;
+  flex:1;
+  padding:10px 14px 40px 14px;
+}
+
+#chart{
+  position:absolute;
+  top:10px;
+  left:14px;
+  right:14px;
+  bottom:40px;
+}
+
+/* Comparison view */
+#comparisonWrap{
+  position:absolute;
+  top:0; left:0; right:0; bottom:0;
+  padding:20px;
+  overflow:auto;
+}
+
+.comparison-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(450px, 1fr));
+  gap:20px;
+}
+
+.comparison-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:16px;
+  box-shadow:var(--shadow);
+}
+
+.comparison-card h3{
+  margin:0 0 12px 0;
+  color:var(--accent);
+  font-size:14px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+}
+
+.comparison-stat{
+  display:flex;
+  justify-content:space-between;
+  padding:10px 0;
+  border-bottom:1px solid rgba(100,108,118,0.2);
+  font-size:13px;
+}
+
+.comparison-stat:last-child{
+  border-bottom:none;
+}
+
+.comparison-value{
+  color:var(--accent);
+  font-weight:600;
+  font-family:monospace;
+}
+
+/* Stats view */
+#statsWrap{
+  position:absolute;
+  top:0; left:0; right:0; bottom:0;
+  padding:20px;
+  overflow:auto;
+}
+
+.stats-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+  gap:16px;
+}
+
+.stat-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:20px;
+  box-shadow:var(--shadow);
+  position:relative;
+  overflow:hidden;
+}
+
+.stat-card::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:4px;
+  background:var(--gradient);
+}
+
+.stat-card-label{
+  font-size:12px;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  margin-bottom:8px;
+}
+
+.stat-card-value{
+  font-size:28px;
+  font-weight:700;
+  color:var(--ink);
+  font-family:monospace;
+  margin-bottom:8px;
+}
+
+.stat-card-sub{
+  font-size:11px;
+  color:var(--muted);
+}
+
+/* Heatmap view */
+#heatmapWrap{
+  position:absolute;
+  top:0; left:0; right:0; bottom:0;
+  padding:20px;
+}
+
+#heatmapCard{
+  height:100%;
+  width:100%;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+#heatmapTitle{
+  padding:16px 20px;
+  border-bottom:1px solid var(--border);
+  font-weight:600;
+  color:var(--accent);
+}
+
+#heatmapContainer{
+  flex:1;
+  position:relative;
+  overflow:auto;
+}
+
+.heatmap-row{
+  display:flex;
+  gap:8px;
+  padding:8px 12px;
+  border-bottom:1px solid rgba(100,108,118,0.1);
+  align-items:center;
+  font-size:12px;
+}
+
+.heatmap-label{
+  width:120px;
+  color:var(--muted);
+  flex-shrink:0;
+}
+
+.heatmap-bars{
+  display:flex;
+  gap:4px;
+  flex:1;
+  height:24px;
+}
+
+.heatmap-bar{
+  flex:1;
+  border-radius:4px;
+  position:relative;
+  transition:all 0.2s;
+}
+
+.heatmap-bar:hover{
+  opacity:0.8;
+  box-shadow:0 0 10px rgba(59,130,246,0.5);
+}
+
+/* Slide-over panel */
+#drawer{
+  position:absolute;
+  top:70px;
+  left:0;
+  bottom:0;
+  width:min(420px, 95vw);
+  background:var(--card);
+  border-right:2px solid var(--border);
+  box-shadow:var(--shadow);
+  transform:translateX(-110%);
+  transition:transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index:2500;
+  display:flex;
+  flex-direction:column;
+}
+
+#drawer.open{
+  transform:translateX(0);
+}
+
+#mouseZone{
+  position:absolute;
+  top:70px;
+  left:0;
+  width:50px;
+  bottom:0;
+  z-index:2450;
+}
+
+#drawerHeader{
+  padding:16px 16px 12px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+#drawerHeader .title{
+  display:flex;
+  flex-direction:column;
+  line-height:1.2;
+}
+#drawerHeader .title strong{font-size:16px}
+#drawerHeader .title span{font-size:11px;color:var(--muted)}
+
+#closeBtn{
+  border:0;
+  background:#334155;
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  cursor:pointer;
+  font-size:20px;
+  line-height:40px;
+  transition:all 0.2s;
+  color:var(--ink);
+}
+#closeBtn:hover{background:#475569}
+
+#drawerBody{
+  padding:14px;
+  overflow:auto;
+  flex:1;
+}
+
+.block{
+  background:#0f172a;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:14px;
+  margin-bottom:14px;
+}
+
+.block h3{
+  margin:0 0 10px 0;
+  font-size:12px;
+  color:var(--accent);
+  letter-spacing:0.5px;
+  text-transform:uppercase;
+  font-weight:600;
+}
+
+#fileRow{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+#csvFiles{
+  width:100%;
+  font-size:13px;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:#1e293b;
+  color:var(--ink);
+  cursor:pointer;
+}
+
+#csvFiles:hover{
+  border-color:var(--accent);
+}
+
+.file-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  max-height:40vh;
+  overflow:auto;
+}
+
+.file-badge{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:#1e293b;
+  border:1px solid var(--border);
+  padding:10px 12px;
+  border-radius:12px;
+  font-size:12px;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+
+.file-badge:hover{
+  background:#334155;
+  border-color:var(--accent);
+}
+
+.file-badge.active{
+  background:var(--accent);
+  color:white;
+  border-color:var(--accent);
+}
+
+.file-remove{
+  background:rgba(239,68,68,0.2);
+  border:none;
+  color:#ef4444;
+  padding:4px 8px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:11px;
+  transition:all 0.2s;
+}
+
+.file-remove:hover{
+  background:rgba(239,68,68,0.4);
+}
+
+#variables{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-height:50vh;
+  overflow:auto;
+  padding-right:4px;
+}
+
+.checkRow{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#1e293b;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.checkRow:hover{
+  border-color:var(--accent);
+  background:#334155;
+}
+.checkRow input{
+  transform:scale(1.3);
+  cursor:pointer;
+  accent-color:var(--accent);
+}
+
+.checkRow-info{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.checkRow-label{
+  font-size:13px;
+  font-weight:600;
+  color:var(--ink);
+}
+
+.checkRow-type{
+  font-size:11px;
+  color:var(--muted);
+}
+
+#statusLine{
+  font-size:12px;
+  color:var(--muted);
+  padding:8px;
+  background:#0f172a;
+  border-radius:8px;
+  margin-top:8px;
+}
+
+#statusLine.success{
+  color:var(--success);
+  background:rgba(16,185,129,0.1);
+  border:1px solid rgba(16,185,129,0.3);
+}
+
+#statusLine.error{
+  color:var(--error);
+  background:rgba(239,68,68,0.1);
+  border:1px solid rgba(239,68,68,0.3);
+}
+
+/* Legend overlay on map */
+#legendBox{
+  position:absolute;
+  right:16px;
+  bottom:16px;
+  z-index:1200;
+  background:rgba(30,41,59,0.95);
+  backdrop-filter:blur(10px);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:var(--shadow);
+  padding:14px 16px 12px 16px;
+  width:240px;
+  pointer-events:none;
+}
+
+#legendTitle{
+  font-weight:600;
+  font-size:13px;
+  margin-bottom:8px;
+  color:var(--accent);
+  text-transform:uppercase;
+}
+
+#legendBar{
+  height:18px;
+  width:100%;
+  border-radius:10px;
+  background:linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b, #ef4444);
+  margin-bottom:8px;
+  box-shadow:0 4px 12px rgba(59,130,246,0.3);
+}
+
+#legendScale{
+  display:flex;
+  justify-content:space-between;
+  font-size:11px;
+  color:var(--muted);
+  font-family:monospace;
+}
+
+/* Dimmer when drawer open on small screens */
+#scrim{
+  position:absolute;
+  top:70px; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.5);
+  z-index:2400;
+  display:none;
+}
+#scrim.show{display:block}
+
+/* Scrollbar styling */
+::-webkit-scrollbar{
+  width:8px;
+  height:8px;
+}
+::-webkit-scrollbar-track{
+  background:var(--card);
+}
+::-webkit-scrollbar-thumb{
+  background:var(--border);
+  border-radius:4px;
+}
+::-webkit-scrollbar-thumb:hover{
+  background:var(--accent);
+}
+
 </style>
 </head>
 
 <body>
 
-<div id="ui">
-  <strong>CSV Map Visualiser</strong><br><br>
-  <input type="file" id="csvFile"><br><br>
-  <div id="variables"></div>
+<div id="topbar">
+  <div id="brand">
+    <strong>⚡ Sensor Logger</strong>
+    <span>Multi-Format Analytics</span>
+  </div>
+
+  <div id="viewTabs">
+    <div class="seg">
+      <button id="btnMap" class="active" type="button">🗺️ Map</button>
+      <button id="btnGraph" type="button">📊 Graph</button>
+      <button id="btnStats" type="button">📈 Stats</button>
+      <button id="btnHeatmap" type="button">🔥 Heatmap</button>
+      <button id="btnCompare" type="button">⚖️ Compare</button>
+    </div>
+    <button id="openPanelBtn" type="button">⚙️ Controls</button>
+  </div>
 </div>
 
-<div id="map"></div>
+<div id="stage">
+  <div id="mapView" class="view active">
+    <div id="map"></div>
+
+    <div id="legendBox">
+      <div id="legendTitle">Variable</div>
+      <div id="legendBar"></div>
+      <div id="legendScale">
+        <span id="legendMin">0</span>
+        <span id="legendMax">1</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="graphView" class="view">
+    <div id="graphWrap">
+      <div id="graphCard">
+        <div id="graphHead">
+          <strong id="graphTitle">Time Series</strong>
+          <span id="graphSub">Select variables to plot</span>
+        </div>
+        <div id="chartArea">
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="statsView" class="view">
+    <div id="statsWrap">
+      <div class="stats-grid" id="statsGrid"></div>
+    </div>
+  </div>
+
+  <div id="heatmapView" class="view">
+    <div id="heatmapWrap">
+      <div id="heatmapCard">
+        <div id="heatmapTitle">Variable Distribution Heatmap</div>
+        <div id="heatmapContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="comparisonView" class="view">
+    <div id="comparisonWrap">
+      <div class="comparison-grid" id="comparisonGrid"></div>
+    </div>
+  </div>
+</div>
+
+<div id="scrim"></div>
+
+<div id="mouseZone"></div>
+
+<div id="drawer">
+  <div id="drawerHeader">
+    <div class="title">
+      <strong>⚙️ Controls</strong>
+      <span>Load files + select variables</span>
+    </div>
+    <button id="closeBtn" type="button">✕</button>
+  </div>
+
+  <div id="drawerBody">
+
+    <div class="block">
+      <h3>📁 Load Files</h3>
+      <div id="fileRow">
+        <input type="file" id="csvFiles" accept=".csv,.txt" multiple>
+        <div class="smallHint" style="font-size:11px;color:var(--muted);">Select one or more files. Auto-detects format from headers.</div>
+        <div id="statusLine">No files loaded</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>📂 Loaded Files</h3>
+      <select id="fileDropdown" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#1e293b;color:var(--ink);font-size:13px;cursor:pointer;">
+        <option value="">-- Select a file --</option>
+      </select>
+      <div id="fileStats" style="font-size:11px;color:var(--muted);margin-top:8px;padding:8px;background:#0f172a;border-radius:8px;"></div>
+    </div>
+
+    <div class="block">
+      <h3>🎨 Variable (Map/Graph)</h3>
+      <div id="variables"></div>
+      <div class="smallHint" style="margin-top:10px;font-size:11px;color:var(--muted);">Choose numeric columns to visualize.</div>
+    </div>
+
+  </div>
+</div>
 
 <script>
-let map = L.map('map');
-let markersLayer = L.layerGroup().addTo(map);
-let data = [];
+// ===== STATE =====
+let map = null;
+let markersLayer = L.layerGroup();
+let loadedFiles = {}; // { filename: { data, format, columns, ... } }
+let currentFile = null;
+let selectedVariables = [];
 let activeVariable = null;
+let chart = null;
+let minValue = 0;
+let maxValue = 1;
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors'
-}).addTo(map);
+// ===== UI: Drawer =====
+const drawer = document.getElementById("drawer");
+const scrim = document.getElementById("scrim");
+const mouseZone = document.getElementById("mouseZone");
 
-// ---------- CSV LOAD ----------
-document.getElementById("csvFile").addEventListener("change", e => {
-  Papa.parse(e.target.files[0], {
-    header: true,
-    dynamicTyping: true,
-    skipEmptyLines: true,
-    transformHeader: h => h.trim(),
-    complete: res => {
+function openDrawer(){
+  drawer.classList.add("open");
+  if(window.innerWidth < 900) scrim.classList.add("show");
+}
+function closeDrawer(){
+  drawer.classList.remove("open");
+  scrim.classList.remove("show");
+}
 
-      data = res.data.filter(r =>
-        typeof r.lat === "number" &&
-        typeof r.lon === "number"
-      );
+document.getElementById("openPanelBtn").addEventListener("click", openDrawer);
+document.getElementById("closeBtn").addEventListener("click", closeDrawer);
+scrim.addEventListener("click", closeDrawer);
 
-      if (data.length === 0) {
-        alert("No valid lat / lon columns found.");
-        return;
+// Auto-hide drawer when mouse leaves the left edge area
+mouseZone.addEventListener("mouseenter", openDrawer);
+drawer.addEventListener("mouseleave", closeDrawer);
+
+openDrawer();
+
+// ===== UI: View switching =====
+function setView(view){
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.querySelectorAll("#viewTabs button").forEach(b => b.classList.remove("active"));
+  
+  const viewMap = {
+    "map": { el: "mapView", btn: "btnMap" },
+    "graph": { el: "graphView", btn: "btnGraph" },
+    "stats": { el: "statsView", btn: "btnStats" },
+    "heatmap": { el: "heatmapView", btn: "btnHeatmap" },
+    "compare": { el: "comparisonView", btn: "btnCompare" }
+  };
+
+  if(!viewMap[view]) return;
+
+  document.getElementById(viewMap[view].el).classList.add("active");
+  document.getElementById(viewMap[view].btn).classList.add("active");
+
+  if(view === "map" && map){
+    setTimeout(() => map.invalidateSize(), 50);
+  }else if(view === "graph"){
+    setTimeout(() => drawGraph(), 100);
+  }else if(view === "stats"){
+    setTimeout(() => drawStats(), 100);
+  }else if(view === "heatmap"){
+    setTimeout(() => drawHeatmap(), 100);
+  }else if(view === "compare"){
+    setTimeout(() => drawComparison(), 100);
+  }
+}
+
+document.getElementById("btnMap").addEventListener("click", () => setView("map"));
+document.getElementById("btnGraph").addEventListener("click", () => setView("graph"));
+document.getElementById("btnStats").addEventListener("click", () => setView("stats"));
+document.getElementById("btnHeatmap").addEventListener("click", () => setView("heatmap"));
+document.getElementById("btnCompare").addEventListener("click", () => setView("compare"));
+
+// ===== MAP INITIALIZATION =====
+function initMap(){
+  if(map) return;
+  
+  map = L.map('map').setView([-37.89, 175.43], 13);
+  markersLayer.addTo(map);
+
+  L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© OpenStreetMap' }
+  ).addTo(map);
+}
+
+initMap();
+
+// ===== FORMAT DETECTION & PARSING =====
+function detectFormatAndParse(text, filename){
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if(lines.length < 2) return null;
+
+  const headerLine = lines[0];
+  let headers, dataStartLine = 1;
+
+  // Try CSV format with headers
+  if(headerLine.includes(',') || headerLine.includes('\t')){
+    const delimiter = headerLine.includes('\t') ? '\t' : ',';
+    headers = headerLine.split(delimiter).map(h => h.trim().toLowerCase());
+    
+    // Parse all data rows
+    const rows = [];
+    for(let i = dataStartLine; i < lines.length; i++){
+      const line = lines[i].trim();
+      if(!line) continue;
+      
+      const values = line.split(delimiter).map(v => v.trim());
+      if(values.length !== headers.length) continue;
+      
+      const row = {};
+      headers.forEach((h, idx) => {
+        row[h] = isNaN(values[idx]) ? values[idx] : parseFloat(values[idx]);
+      });
+      
+      rows.push(row);
+    }
+
+    if(rows.length > 0){
+      return {
+        format: "csv",
+        headers,
+        data: rows,
+        filename
+      };
+    }
+  }
+
+  // Fallback: try as fixed-width or space-delimited
+  headers = headerLine.split(/[\s,\t]+/).map(h => h.trim().toLowerCase());
+  const rows = [];
+  
+  for(let i = dataStartLine; i < lines.length; i++){
+    const line = lines[i].trim();
+    if(!line) continue;
+    
+    const values = line.split(/[\s,\t]+/);
+    if(values.length !== headers.length) continue;
+    
+    const row = {};
+    headers.forEach((h, idx) => {
+      row[h] = isNaN(values[idx]) ? values[idx] : parseFloat(values[idx]);
+    });
+    
+    rows.push(row);
+  }
+
+  if(rows.length > 0){
+    return {
+      format: "flexible",
+      headers,
+      data: rows,
+      filename
+    };
+  }
+
+  return null;
+}
+
+// ===== GPS VALIDATION =====
+function isValidGPS(lat, lon){
+  if(!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  // Check if coordinates are zero or near-zero (GPS dropout)
+  if(Math.abs(lat) < 0.0001 || Math.abs(lon) < 0.0001) return false;
+  return true;
+}
+
+// ===== FILE LOADING =====
+document.getElementById("csvFiles").addEventListener("change", e => {
+  const files = Array.from(e.target.files);
+  
+  Promise.all(files.map(file => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const parsed = detectFormatAndParse(evt.target.result, file.name);
+        resolve(parsed);
+      };
+      reader.readAsText(file);
+    });
+  })).then(results => {
+    results.forEach(result => {
+      if(!result) return;
+      
+      // Clean data: filter valid GPS coordinates
+      const latKey = result.headers.includes('lat') ? 'lat' : 
+                     result.headers.includes('latitude') ? 'latitude' : null;
+      const lonKey = result.headers.includes('lon') ? 'lon' :
+                     result.headers.includes('longitude') ? 'longitude' : null;
+
+      if(latKey && lonKey){
+        result.data = result.data.filter(row => 
+          isValidGPS(row[latKey], row[lonKey])
+        );
       }
 
-      buildVariableList();
-      zoomToCSV();          // ✅ CRITICAL
-    }
-  });
-});
+      // Compute GPS speed if we have lat/lon/time
+      if(latKey && lonKey && result.data.length > 0){
+        computeGPSSpeed(result.data, latKey, lonKey);
+      }
 
-// ---------- UI ----------
-function buildVariableList() {
-  const container = document.getElementById("variables");
-  container.innerHTML = "<strong>Colour by variable:</strong><br>";
-
-  const ignore = ["lat", "lon"];
-
-  Object.keys(data[0]).forEach(key => {
-    if (ignore.includes(key)) return;
-    if (typeof data[0][key] !== "number") return;
-
-    const label = document.createElement("label");
-    label.innerHTML = `
-      <input type="radio" name="variable" value="${key}">
-      ${key}
-    `;
-
-    label.querySelector("input").addEventListener("change", () => {
-      activeVariable = key;
-      plotMarkers();
+      loadedFiles[result.filename] = result;
     });
 
-    container.appendChild(label);
+    updateFileList();
+    updateStatusLine();
+  });
+
+  e.target.value = '';
+});
+
+// File dropdown selector
+document.getElementById("fileDropdown").addEventListener("change", e => {
+  if(e.target.value){
+    selectFile(e.target.value);
+  }
+});
+
+function updateFileList(){
+  const dropdown = document.getElementById("fileDropdown");
+  const fileStats = document.getElementById("fileStats");
+  const currentSelection = dropdown.value;
+  
+  dropdown.innerHTML = '<option value="">-- Select a file --</option>';
+
+  Object.entries(loadedFiles).forEach(([filename, fileData]) => {
+    const option = document.createElement("option");
+    option.value = filename;
+    option.textContent = `${filename} (${fileData.data.length} rows)`;
+    dropdown.appendChild(option);
+  });
+
+  dropdown.value = currentSelection;
+
+  // Update stats for current file
+  if(currentFile && loadedFiles[currentFile]){
+    const fileData = loadedFiles[currentFile];
+    const latKey = fileData.headers.find(h => ['lat', 'latitude'].includes(h));
+    const lonKey = fileData.headers.find(h => ['lon', 'longitude'].includes(h));
+    let validGPS = 0;
+    
+    if(latKey && lonKey){
+      validGPS = fileData.data.filter(d => 
+        isValidGPS(Number(d[latKey]), Number(d[lonKey]))
+      ).length;
+    }
+
+    fileStats.innerHTML = `
+      <div style="margin:4px 0;"><span style="color:var(--muted);">Format:</span> ${fileData.format}</div>
+      <div style="margin:4px 0;"><span style="color:var(--muted);">Columns:</span> ${fileData.headers.length}</div>
+      ${validGPS > 0 ? `<div style="margin:4px 0;"><span style="color:var(--muted);">GPS Points:</span> ${validGPS}/${fileData.data.length}</div>` : ''}
+    `;
+  } else {
+    fileStats.innerHTML = '';
+  }
+}
+
+function removeFile(filename){
+  delete loadedFiles[filename];
+  if(currentFile === filename) currentFile = null;
+  selectedVariables = [];
+  activeVariable = null;
+  updateFileList();
+  updateStatusLine();
+  document.getElementById("variables").innerHTML = '';
+  markersLayer.clearLayers();
+}
+
+function selectFile(filename){
+  currentFile = filename;
+  selectedVariables = [];
+  activeVariable = null;
+  updateFileList();
+  buildVariableList();
+  plotMarkers();
+  updateStatusLine();
+}
+
+function updateStatusLine(){
+  const status = document.getElementById("statusLine");
+  const count = Object.keys(loadedFiles).length;
+  
+  if(count === 0){
+    status.textContent = "No files loaded";
+    status.className = "";
+  }else{
+    status.textContent = `${count} file(s) loaded • Current: ${currentFile || "Select a file"}`;
+    status.className = "success";
+  }
+}
+
+// ===== GPS SPEED CALCULATION =====
+function computeGPSSpeed(data, latKey, lonKey){
+  const windowSize = 10;
+
+  function haversine(lat1, lon1, lat2, lon2){
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + 
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  data.forEach((row, i) => {
+    if(i < windowSize){
+      row.gps_speed_ms = 0;
+      row.gps_speed_kmh = 0;
+      return;
+    }
+
+    let dist = 0;
+    for(let j = i - windowSize + 1; j <= i; j++){
+      const p1 = data[j-1];
+      const p2 = data[j];
+      dist += haversine(p1[latKey], p1[lonKey], p2[latKey], p2[lonKey]);
+    }
+
+    row.gps_speed_ms = dist / windowSize;
+    row.gps_speed_kmh = dist / windowSize * 3.6;
   });
 }
 
-// ---------- MAP ----------
-function zoomToCSV() {
-  const bounds = L.latLngBounds(data.map(d => [d.lat, d.lon]));
-  map.fitBounds(bounds, { padding: [40, 40] });
-  map.invalidateSize();   // 🔒 forces redraw
+// ===== VARIABLE LIST =====
+function buildVariableList(){
+  const container = document.getElementById("variables");
+  container.innerHTML = '';
+
+  if(!currentFile || !loadedFiles[currentFile]) return;
+
+  const fileData = loadedFiles[currentFile];
+  const ignore = ['lat', 'latitude', 'lon', 'longitude', 'time', 'rtc_time', 'gps_time', 'time_ms', 'time_s', 'elapsed', 'datetime', 'flag', 'status'];
+
+  const first = fileData.data[0];
+  if(!first) return;
+
+  fileData.headers.forEach(key => {
+    if(ignore.includes(key)) return;
+    if(typeof first[key] !== 'number') return;
+
+    const row = document.createElement("label");
+    row.className = "checkRow";
+
+    const isSelected = selectedVariables.includes(key);
+    row.innerHTML = `
+      <input type="checkbox" value="${key}" ${isSelected ? 'checked' : ''}>
+      <div class="checkRow-info">
+        <div class="checkRow-label">${key}</div>
+        <div class="checkRow-type">numeric</div>
+      </div>
+    `;
+
+    const input = row.querySelector("input");
+    input.addEventListener("change", () => {
+      if(input.checked){
+        if(selectedVariables.length >= 3){
+          input.checked = false;
+          alert("Maximum 3 variables allowed");
+          return;
+        }
+        selectedVariables.push(key);
+      }else{
+        selectedVariables = selectedVariables.filter(v => v !== key);
+      }
+
+      activeVariable = selectedVariables.length > 0 ? selectedVariables[0] : null;
+      plotMarkers();
+      drawGraph();
+      drawStats();
+      drawHeatmap();
+      drawComparison();
+    });
+
+    container.appendChild(row);
+  });
 }
 
-function plotMarkers() {
+// ===== MAP VISUALIZATION =====
+function plotMarkers(){
   markersLayer.clearLayers();
-  if (!activeVariable) return;
 
-  const values = data.map(d => d[activeVariable]);
-  const minV = Math.min(...values);
-  const maxV = Math.max(...values);
+  if(!currentFile || !activeVariable || !loadedFiles[currentFile]) return;
 
-  data.forEach(d => {
-    const t = (d[activeVariable] - minV) / (maxV - minV || 1);
+  const fileData = loadedFiles[currentFile];
+  const latKey = fileData.headers.find(h => ['lat', 'latitude'].includes(h));
+  const lonKey = fileData.headers.find(h => ['lon', 'longitude'].includes(h));
+
+  if(!latKey || !lonKey) return;
+
+  const values = fileData.data
+    .map(d => Number(d[activeVariable]))
+    .filter(v => Number.isFinite(v));
+
+  if(values.length === 0) return;
+
+  minValue = Math.min(...values);
+  maxValue = Math.max(...values);
+
+  fileData.data.forEach(d => {
+    const lat = Number(d[latKey]);
+    const lon = Number(d[lonKey]);
+    const v = Number(d[activeVariable]);
+
+    if(!isValidGPS(lat, lon) || !Number.isFinite(v)) return;
+
+    const t = (v - minValue) / (maxValue - minValue || 1);
     const color = getColor(t);
 
-    const marker = L.circleMarker(
-      [d.lat, d.lon],
-      {
-        radius: 6,
-        color,
-        fillColor: color,
-        fillOpacity: 0.9
-      }
-    ).bindPopup(`
-      <strong>${activeVariable}</strong>: ${d[activeVariable]}<br><br>
-      <b>Time:</b> ${d.time_s} s<br>
-      <b>CO₂:</b> ${d.co2_ppm} ppm<br>
-      <b>SCD Temp:</b> ${d.scd_temp} °C<br>
-      <b>Humidity:</b> ${d.humidity_pct} %<br>
-      <b>Pressure:</b> ${d.pressure_Pa} Pa<br>
-      <b>BMP Temp:</b> ${d.bmp_temp_C} °C<br>
-      <b>Altitude:</b> ${d.alt_m} m<br>
-      <b>Sats:</b> ${d.sats}
-    `);
+    let popup = `<div style="font-family:monospace;font-size:12px;">`;
+    fileData.headers.forEach(key => {
+      let value = d[key];
+      if(value === null || value === undefined) return;
+      if(typeof value === 'number') value = value.toFixed(2);
+      popup += `<b>${key}</b>: ${value}<br>`;
+    });
+    popup += `</div>`;
+
+    const marker = L.circleMarker([lat, lon], {
+      radius: 7,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.85,
+      weight: 2
+    }).bindPopup(popup);
 
     markersLayer.addLayer(marker);
   });
 
-  map.fitBounds(markersLayer.getBounds(), { padding: [40, 40] });
+  updateLegend();
+  zoomToData();
 }
 
-// ---------- COLOUR ----------
-function getColor(t) {
-  const hue = 240 - 240 * t;
-  return `hsl(${hue}, 100%, 45%)`;
+function zoomToData(){
+  if(!currentFile || !loadedFiles[currentFile]) return;
+
+  const fileData = loadedFiles[currentFile];
+  const latKey = fileData.headers.find(h => ['lat', 'latitude'].includes(h));
+  const lonKey = fileData.headers.find(h => ['lon', 'longitude'].includes(h));
+
+  if(!latKey || !lonKey) return;
+
+  const validPoints = fileData.data.filter(d => 
+    isValidGPS(Number(d[latKey]), Number(d[lonKey]))
+  );
+
+  if(validPoints.length === 0) return;
+
+  const bounds = L.latLngBounds(
+    validPoints.map(d => [Number(d[latKey]), Number(d[lonKey])])
+  );
+  
+  map.fitBounds(bounds, { padding: [50, 50] });
 }
+
+function updateLegend(){
+  document.getElementById("legendTitle").textContent = activeVariable || "Variable";
+  document.getElementById("legendMin").textContent = minValue.toFixed(2);
+  document.getElementById("legendMax").textContent = maxValue.toFixed(2);
+}
+
+// ===== DANGER LEVEL THRESHOLDS =====
+const dangerThresholds = {
+  co2: [
+    { level: 'Good', max: 400, color: 'rgba(16,185,129,0.3)', borderColor: '#10b981' },
+    { level: 'Acceptable', max: 800, color: 'rgba(34,197,94,0.3)', borderColor: '#22c55e' },
+    { level: 'Fair', max: 1200, color: 'rgba(245,158,11,0.3)', borderColor: '#f59e0b' },
+    { level: 'Poor', max: 1600, color: 'rgba(239,68,68,0.3)', borderColor: '#ef4444' },
+    { level: 'Very Poor', max: Infinity, color: 'rgba(127,29,29,0.3)', borderColor: '#7f1d1d' }
+  ],
+  pm25: [
+    { level: 'Good', max: 12, color: 'rgba(16,185,129,0.3)', borderColor: '#10b981' },
+    { level: 'Moderate', max: 35.4, color: 'rgba(59,130,246,0.3)', borderColor: '#3b82f6' },
+    { level: 'Unhealthy for Sensitive', max: 55.4, color: 'rgba(245,158,11,0.3)', borderColor: '#f59e0b' },
+    { level: 'Unhealthy', max: 150.4, color: 'rgba(239,68,68,0.3)', borderColor: '#ef4444' },
+    { level: 'Very Unhealthy', max: 250.4, color: 'rgba(139,0,139,0.3)', borderColor: '#8b008b' },
+    { level: 'Hazardous', max: Infinity, color: 'rgba(139,0,0,0.3)', borderColor: '#8b0000' }
+  ],
+  pm10: [
+    { level: 'Good', max: 54, color: 'rgba(16,185,129,0.3)', borderColor: '#10b981' },
+    { level: 'Moderate', max: 154, color: 'rgba(59,130,246,0.3)', borderColor: '#3b82f6' },
+    { level: 'Unhealthy for Sensitive', max: 254, color: 'rgba(245,158,11,0.3)', borderColor: '#f59e0b' },
+    { level: 'Unhealthy', max: 354, color: 'rgba(239,68,68,0.3)', borderColor: '#ef4444' },
+    { level: 'Very Unhealthy', max: 424, color: 'rgba(139,0,139,0.3)', borderColor: '#8b008b' },
+    { level: 'Hazardous', max: Infinity, color: 'rgba(139,0,0,0.3)', borderColor: '#8b0000' }
+  ],
+  pm1: [
+    { level: 'Good', max: 12, color: 'rgba(16,185,129,0.3)', borderColor: '#10b981' },
+    { level: 'Moderate', max: 35.4, color: 'rgba(59,130,246,0.3)', borderColor: '#3b82f6' },
+    { level: 'Unhealthy for Sensitive', max: 55.4, color: 'rgba(245,158,11,0.3)', borderColor: '#f59e0b' },
+    { level: 'Unhealthy', max: 150.4, color: 'rgba(239,68,68,0.3)', borderColor: '#ef4444' },
+    { level: 'Very Unhealthy', max: 250.4, color: 'rgba(139,0,139,0.3)', borderColor: '#8b008b' },
+    { level: 'Hazardous', max: Infinity, color: 'rgba(139,0,0,0.3)', borderColor: '#8b0000' }
+  ],
+  humidity: [
+    { level: 'Low', max: 30, color: 'rgba(239,68,68,0.3)', borderColor: '#ef4444' },
+    { level: 'Optimal', max: 50, color: 'rgba(16,185,129,0.3)', borderColor: '#10b981' },
+    { level: 'Comfortable', max: 70, color: 'rgba(16,185,129,0.3)', borderColor: '#10b981' },
+    { level: 'High', max: Infinity, color: 'rgba(239,68,68,0.3)', borderColor: '#ef4444' }
+  ],
+  temp: [
+    { level: 'Cold', max: 10, color: 'rgba(59,130,246,0.3)', borderColor: '#3b82f6' },
+    { level: 'Cool', max: 20, color: 'rgba(16,185,129,0.3)', borderColor: '#10b981' },
+    { level: 'Warm', max: 30, color: 'rgba(245,158,11,0.3)', borderColor: '#f59e0b' },
+    { level: 'Hot', max: Infinity, color: 'rgba(239,68,68,0.3)', borderColor: '#ef4444' }
+  ],
+  pressure: [
+    { level: 'Very Low', max: 1000, color: 'rgba(139,0,0,0.3)', borderColor: '#8b0000' },
+    { level: 'Low', max: 1013, color: 'rgba(245,158,11,0.3)', borderColor: '#f59e0b' },
+    { level: 'Normal', max: 1027, color: 'rgba(16,185,129,0.3)', borderColor: '#10b981' },
+    { level: 'High', max: 1040, color: 'rgba(245,158,11,0.3)', borderColor: '#f59e0b' },
+    { level: 'Very High', max: Infinity, color: 'rgba(139,0,0,0.3)', borderColor: '#8b0000' }
+  ]
+};
+
+function getDangerThresholds(varName){
+  const normalized = varName.toLowerCase();
+  
+  for(const [key, thresholds] of Object.entries(dangerThresholds)){
+    if(normalized.includes(key)){
+      return thresholds;
+    }
+  }
+  
+  return null;
+}
+
+// ===== GRAPH =====
+function drawGraph(){
+  const ctx = document.getElementById("chart");
+
+  if(chart){
+    chart.destroy();
+    chart = null;
+  }
+
+  if(selectedVariables.length === 0 || !currentFile || !loadedFiles[currentFile]) return;
+
+  const fileData = loadedFiles[currentFile];
+  const timeKey = fileData.headers.find(h => 
+    ['rtc_time', 'gps_time', 'time_ms', 'elapsed', 'datetime'].includes(h)
+  );
+
+  const labels = fileData.data.map((d, i) => {
+    if(timeKey && typeof d[timeKey] === 'string' && d[timeKey].length > 3){
+      return d[timeKey].substring(0, 8);
+    }
+    return i;
+  });
+
+  const colors = ["#3b82f6", "#ef4444", "#10b981"];
+  const datasets = selectedVariables.map((v, i) => {
+    const values = fileData.data.map(d => {
+      const val = Number(d[v]);
+      return Number.isFinite(val) ? val : null;
+    });
+
+    return {
+      label: v,
+      data: values,
+      borderColor: colors[i],
+      backgroundColor: colors[i],
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.3,
+      yAxisID: i === 0 ? 'y' : (i === 1 ? 'y1' : 'y2'),
+      fill: false
+    };
+  });
+
+  const yAxes = {
+    y: {
+      type: 'linear',
+      position: 'left',
+      title: { display: true, text: selectedVariables[0] || '' },
+      grid: { color: 'rgba(100,108,118,0.1)' },
+      ticks: { color: '#94a3b8' }
+    }
+  };
+
+  if(selectedVariables[1]){
+    yAxes.y1 = {
+      type: 'linear',
+      position: 'right',
+      title: { display: true, text: selectedVariables[1] || '' },
+      grid: { drawOnChartArea: false },
+      ticks: { color: '#94a3b8' }
+    };
+  }
+
+  if(selectedVariables[2]){
+    yAxes.y2 = {
+      type: 'linear',
+      position: 'left',
+      title: { display: true, text: selectedVariables[2] || '' },
+      grid: { drawOnChartArea: false },
+      ticks: { color: '#94a3b8' }
+    };
+  }
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 12 } } },
+        dangerThresholds: true
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Time', color: '#94a3b8' },
+          ticks: { color: '#94a3b8', autoSkip: true, maxRotation: 45 },
+          grid: { color: 'rgba(100,108,118,0.1)' }
+        },
+        ...yAxes
+      }
+    },
+    plugins: [{
+      id: 'dangerThresholds',
+      afterDraw(chart){
+        const ctx = chart.ctx;
+        
+        selectedVariables.forEach((varName, varIndex) => {
+          const thresholds = getDangerThresholds(varName);
+          if(!thresholds) return;
+
+          const yAxisID = varIndex === 0 ? 'y' : (varIndex === 1 ? 'y1' : 'y2');
+          const yAxis = chart.scales[yAxisID];
+          if(!yAxis) return;
+
+          // Draw thresholds once
+          thresholds.forEach((threshold, idx) => {
+            const yPos = yAxis.getPixelForValue(threshold.max);
+            
+            // Draw dashed line
+            ctx.strokeStyle = threshold.borderColor;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(chart.chartArea.left, yPos);
+            ctx.lineTo(chart.chartArea.right, yPos);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw label with 4x bigger font
+            ctx.fillStyle = threshold.borderColor;
+            ctx.font = 'bold 44px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(threshold.level, chart.chartArea.right - 20, yPos - 15);
+          });
+
+          // For PM2.5, draw a second set of lines offset slightly
+          if(varName.toLowerCase().includes('pm2') || varName.toLowerCase().includes('pm25')){
+            thresholds.forEach((threshold, idx) => {
+              const yPos = yAxis.getPixelForValue(threshold.max);
+              
+              // Draw solid line (slightly thinner) for second set
+              ctx.strokeStyle = threshold.borderColor;
+              ctx.lineWidth = 2.5;
+              ctx.globalAlpha = 0.7;
+              ctx.beginPath();
+              ctx.moveTo(chart.chartArea.left, yPos);
+              ctx.lineTo(chart.chartArea.right, yPos);
+              ctx.stroke();
+              ctx.globalAlpha = 1;
+            });
+          }
+        });
+      }
+    }]
+  });
+}
+
+// ===== STATS =====
+function drawStats(){
+  const grid = document.getElementById("statsGrid");
+  grid.innerHTML = '';
+
+  if(!currentFile || !loadedFiles[currentFile]) return;
+
+  const fileData = loadedFiles[currentFile];
+  const latKey = fileData.headers.find(h => ['lat', 'latitude'].includes(h));
+  const lonKey = fileData.headers.find(h => ['lon', 'longitude'].includes(h));
+
+  selectedVariables.forEach(varName => {
+    const values = fileData.data
+      .map(d => Number(d[varName]))
+      .filter(v => Number.isFinite(v));
+
+    if(values.length === 0) return;
+
+    const mean = values.reduce((a,b) => a+b) / values.length;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
+    const stdev = Math.sqrt(variance);
+
+    const card = document.createElement("div");
+    card.className = "stat-card";
+    card.innerHTML = `
+      <div class="stat-card-label">${varName}</div>
+      <div class="stat-card-value">${mean.toFixed(2)}</div>
+      <div class="stat-card-sub">Mean (μ)</div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:6px 0;">
+          <span>Min</span><span style="color:var(--accent);">${min.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:6px 0;">
+          <span>Max</span><span style="color:var(--accent);">${max.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:6px 0;">
+          <span>Range</span><span style="color:var(--accent);">${range.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:6px 0;">
+          <span>Stdev (σ)</span><span style="color:var(--accent);">${stdev.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:6px 0;">
+          <span>Count</span><span style="color:var(--accent);">${values.length}</span>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Add overall file stats
+  const card = document.createElement("div");
+  card.className = "stat-card";
+  card.innerHTML = `
+    <div class="stat-card-label">${currentFile}</div>
+    <div class="stat-card-value">${fileData.data.length}</div>
+    <div class="stat-card-sub">Total Records</div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin:6px 0;">
+        <span>Variables</span><span style="color:var(--accent);">${fileData.headers.length}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin:6px 0;">
+        <span>Format</span><span style="color:var(--accent);">${fileData.format}</span>
+      </div>
+      ${latKey && lonKey ? `
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin:6px 0;">
+          <span>GPS Points</span><span style="color:var(--accent);">${fileData.data.filter(d => isValidGPS(Number(d[latKey]), Number(d[lonKey]))).length}</span>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  grid.appendChild(card);
+}
+
+// ===== HEATMAP =====
+function drawHeatmap(){
+  const container = document.getElementById("heatmapContainer");
+  container.innerHTML = '';
+
+  if(!currentFile || !loadedFiles[currentFile]) return;
+
+  const fileData = loadedFiles[currentFile];
+
+  selectedVariables.forEach(varName => {
+    const values = fileData.data
+      .map(d => Number(d[varName]))
+      .filter(v => Number.isFinite(v));
+
+    if(values.length === 0) return;
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+
+    // Sample every Nth point for display
+    const sampleRate = Math.max(1, Math.floor(values.length / 30));
+    
+    for(let i = 0; i < values.length; i += sampleRate){
+      const v = values[i];
+      const norm = (v - min) / (range || 1);
+      const barColor = getColor(norm);
+
+      const row = document.createElement("div");
+      row.className = "heatmap-row";
+      row.innerHTML = `
+        <div class="heatmap-label">${varName} [${i}]</div>
+        <div class="heatmap-bars">
+          <div class="heatmap-bar" style="background:${barColor};width:100%;" title="${v.toFixed(2)}"></div>
+        </div>
+        <div style="color:var(--muted);font-size:11px;width:60px;text-align:right;">${v.toFixed(1)}</div>
+      `;
+      container.appendChild(row);
+    }
+  });
+}
+
+// ===== COMPARISON =====
+function drawComparison(){
+  const grid = document.getElementById("comparisonGrid");
+  grid.innerHTML = '';
+
+  if(Object.keys(loadedFiles).length === 0) return;
+
+  Object.entries(loadedFiles).forEach(([filename, fileData]) => {
+    const card = document.createElement("div");
+    card.className = "comparison-card";
+
+    let html = `<h3>${filename}</h3>`;
+    
+    const latKey = fileData.headers.find(h => ['lat', 'latitude'].includes(h));
+    const lonKey = fileData.headers.find(h => ['lon', 'longitude'].includes(h));
+
+    html += `
+      <div class="comparison-stat">
+        <span>Records</span>
+        <span class="comparison-value">${fileData.data.length}</span>
+      </div>
+      <div class="comparison-stat">
+        <span>Variables</span>
+        <span class="comparison-value">${fileData.headers.length}</span>
+      </div>
+      <div class="comparison-stat">
+        <span>Format</span>
+        <span class="comparison-value">${fileData.format}</span>
+      </div>
+    `;
+
+    if(latKey && lonKey){
+      const validGPS = fileData.data.filter(d => 
+        isValidGPS(Number(d[latKey]), Number(d[lonKey]))
+      ).length;
+      html += `
+        <div class="comparison-stat">
+          <span>GPS Points</span>
+          <span class="comparison-value">${validGPS}</span>
+        </div>
+      `;
+    }
+
+    selectedVariables.forEach(varName => {
+      const values = fileData.data
+        .map(d => Number(d[varName]))
+        .filter(v => Number.isFinite(v));
+
+      if(values.length === 0) return;
+
+      const mean = values.reduce((a,b) => a+b) / values.length;
+      html += `
+        <div class="comparison-stat">
+          <span>Ø ${varName}</span>
+          <span class="comparison-value">${mean.toFixed(2)}</span>
+        </div>
+      `;
+    });
+
+    card.innerHTML = html;
+    grid.appendChild(card);
+  });
+}
+
+// ===== COLOR FUNCTION =====
+function getColor(t){
+  const hue = 240 - 240 * t;
+  return `hsl(${hue},100%,45%)`;
+}
+
+setView("map");
+
 </script>
 
 </body>
