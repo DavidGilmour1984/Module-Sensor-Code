@@ -1,0 +1,92 @@
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+#define VP_PIN 36
+
+#define SERVICE_UUID        "12345678-1234-1234-1234-123456789abc"
+#define CHARACTERISTIC_UUID "abcd1234-ab12-ab12-ab12-abcdef123456"
+#define CONFIG_UUID         "abcd5678-ab12-ab12-ab12-abcdef123456"
+
+BLEServer*         pServer         = nullptr;
+BLECharacteristic* pDataChar       = nullptr;
+BLECharacteristic* pConfigChar     = nullptr;
+bool               deviceConnected = false;
+int                sampleRateMs    = 500;
+
+class ServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) override {
+    deviceConnected = true;
+    Serial.println("Client connected.");
+  }
+  void onDisconnect(BLEServer* pServer) override {
+    deviceConnected = false;
+    Serial.println("Client disconnected. Restarting advertising...");
+    BLEDevice::startAdvertising();
+  }
+};
+
+class ConfigCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* pCharacteristic) override {
+    String val = pCharacteristic->getValue().c_str();
+    if (val.startsWith("RATE:")) {
+      int rate = val.substring(5).toInt();
+      if (rate >= 50 && rate <= 10000) {
+        sampleRateMs = rate;
+        Serial.printf("Sample rate set to %d ms\n", sampleRateMs);
+      }
+    }
+  }
+};
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(VP_PIN, INPUT);
+
+  BLEDevice::init("ESP32_VP_Sensor");
+
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new ServerCallbacks());
+
+  BLEService* pService = pServer->createService(SERVICE_UUID);
+
+  pDataChar = pService->createCharacteristic(
+    CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_NOTIFY
+  );
+  pDataChar->addDescriptor(new BLE2902());
+
+  pConfigChar = pService->createCharacteristic(
+    CONFIG_UUID,
+    BLECharacteristic::PROPERTY_WRITE
+  );
+  pConfigChar->setCallbacks(new ConfigCallbacks());
+
+  pService->start();
+
+  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  BLEDevice::startAdvertising();
+
+  Serial.println("BLE advertising started. Device: ESP32_VP_Sensor");
+}
+
+void loop() {
+  if (deviceConnected) {
+    int   raw     = analogRead(VP_PIN);
+    float voltage = raw * (3.3f / 4095.0f);
+
+    // Packet: timestamp_ms,raw,voltage
+    unsigned long ts = millis();
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%lu,%.4f,%d", ts, voltage, raw);
+
+    pDataChar->setValue(buf);
+    pDataChar->notify();
+
+    Serial.printf("[%lu ms] Raw: %d | Voltage: %.4f V\n", ts, raw, voltage);
+  }
+  delay(sampleRateMs);
+}
